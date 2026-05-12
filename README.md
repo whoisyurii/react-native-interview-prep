@@ -1674,7 +1674,7 @@ return <Assistant mode={mode} />;
 <a id="g01"></a>
 ### G01. What are the major phases of the Fabric rendering pipeline?
 
-- **Answer:** React produces a tree, layout is calculated through Shadow Nodes, changes are committed, and native views are mounted. The important point is that React and native rendering now coordinate through a modern C++ renderer designed for concurrency.
+- **Answer:** React produces a tree, layout is calculated through Shadow Nodes, changes are committed, and native views are mounted. The important point is that React and native rendering now coordinate through a modern C++ renderer designed for concurrency. God Mode understanding means knowing that "rendered" does not mean "native view already changed." The performance and correctness questions usually live in the gaps between render, layout, commit, and mount.
 
 ```txt
 React render -> Shadow Tree -> Yoga layout -> commit -> mount
@@ -1685,7 +1685,7 @@ React render -> Shadow Tree -> Yoga layout -> commit -> mount
 <a id="g02"></a>
 ### G02. Why does synchronous layout matter in the New Architecture?
 
-- **Answer:** It lets code measure layout and update UI in the same commit path where appropriate. This avoids visible two-pass flicker for cases like tooltips, anchored overlays, and measurement-dependent layout.
+- **Answer:** It lets code measure layout and update UI in the same commit path where appropriate. This avoids visible two-pass flicker for cases like tooltips, anchored overlays, and measurement-dependent layout. The old mental model often forced a second async pass after layout had already appeared on screen. The New Architecture makes some measurement-dependent UI possible without turning every layout decision into visible jitter.
 
 ```tsx
 useLayoutEffect(() => {
@@ -1698,7 +1698,7 @@ useLayoutEffect(() => {
 <a id="g03"></a>
 ### G03. What is a Shadow Tree?
 
-- **Answer:** The Shadow Tree is React Native's layout representation of the UI, separate from actual native views. It lets React Native calculate layout and prepare mutations before mounting them to the platform UI layer.
+- **Answer:** The Shadow Tree is React Native's layout representation of the UI, separate from actual native views. It lets React Native calculate layout and prepare mutations before mounting them to the platform UI layer. This separation is why React Native can reason about layout without immediately touching UIKit or Android Views. When debugging hard rendering issues, knowing which tree you are talking about matters.
 
 ```txt
 React element: <View />
@@ -1711,7 +1711,7 @@ Native view: UIView / android.view.View
 <a id="g04"></a>
 ### G04. What is the difference between commit and mount?
 
-- **Answer:** Commit finalizes a set of UI changes in the renderer's tree. Mount applies the resulting mutations to the actual native view hierarchy.
+- **Answer:** Commit finalizes a set of UI changes in the renderer's tree. Mount applies the resulting mutations to the actual native view hierarchy. A commit is about accepting a new consistent tree state; mounting is about executing the native side effects. Confusing the two leads to vague performance answers because CPU work can be spent in different phases.
 
 ```txt
 commit: finalize tree mutation
@@ -1723,7 +1723,7 @@ mount: apply mutation to native views
 <a id="g05"></a>
 ### G05. How does JSI change native interop failure modes?
 
-- **Answer:** JSI removes a lot of serialization overhead but introduces sharper concerns around object lifetime, thread affinity, runtime ownership, and native crashes. Bugs can move from "slow bridge call" to memory or concurrency issues.
+- **Answer:** JSI removes a lot of serialization overhead but introduces sharper concerns around object lifetime, thread affinity, runtime ownership, and native crashes. Bugs can move from "slow bridge call" to memory or concurrency issues. That is a power upgrade, not just a speed upgrade. A strong engineer treats JSI APIs like native APIs with explicit ownership rules, not like ordinary JavaScript utilities.
 
 ```cpp
 jsi::Value getValue(jsi::Runtime& rt) {
@@ -1736,7 +1736,7 @@ jsi::Value getValue(jsi::Runtime& rt) {
 <a id="g06"></a>
 ### G06. When is a synchronous native method justified?
 
-- **Answer:** Only when JavaScript needs an immediate value to continue correctly, such as cheap constants or tightly coupled layout/runtime queries. Synchronous calls can block execution, so heavy I/O or computation should stay async or off-thread.
+- **Answer:** Only when JavaScript needs an immediate value to continue correctly, such as cheap constants or tightly coupled layout/runtime queries. Synchronous calls can block execution, so heavy I/O or computation should stay async or off-thread. The question is not "can we make this sync," but "is blocking the caller worth the correctness benefit." Most device APIs, storage reads, network calls, and media work should not be synchronous.
 
 ```ts
 const constants = NativeModules.PlatformConstants.getConstants();
@@ -1748,7 +1748,7 @@ const isTablet = constants.interfaceIdiom === "pad";
 <a id="g07"></a>
 ### G07. What does Hermes V1 becoming default imply for teams?
 
-- **Answer:** Teams get the new engine path without manual opt-in, but they must test startup, runtime behavior, native integrations, and tooling compatibility. Engine upgrades can expose assumptions in debugging, bytecode, and native JSI integrations.
+- **Answer:** Teams get the new engine path without manual opt-in, but they must test startup, runtime behavior, native integrations, and tooling compatibility. Engine upgrades can expose assumptions in debugging, bytecode, and native JSI integrations. Hermes is part of the runtime contract, so changes can affect more than benchmark numbers. Native modules that touch the JS runtime deserve special attention during engine upgrades.
 
 ```ts
 const isHermes = !!global.HermesInternal;
@@ -1760,7 +1760,7 @@ console.log({ isHermes });
 <a id="g08"></a>
 ### G08. What are the risks of multiple JavaScript runtimes?
 
-- **Answer:** Values, object identity, scheduling, and lifetime do not automatically transfer safely between runtimes. Worklet-style systems need explicit serialization or shareable models and careful rules for native resources.
+- **Answer:** Values, object identity, scheduling, and lifetime do not automatically transfer safely between runtimes. Worklet-style systems need explicit serialization or shareable models and careful rules for native resources. Multiple runtimes are powerful because they isolate latency-sensitive work, but they also make "same object" assumptions dangerous. You need to know what is copied, what is shared, and who owns cleanup.
 
 ```ts
 // Do not pass live JS objects across runtimes by accident.
@@ -1772,7 +1772,7 @@ runOnUI((value) => { "worklet"; shared.value = value; })(count);
 <a id="g09"></a>
 ### G09. Why is Codegen a strategic feature, not just tooling?
 
-- **Answer:** It makes the JS-native contract explicit and repeatable across platforms. That enables safer libraries, better upgrades, and less hand-written glue as React Native removes legacy architecture code.
+- **Answer:** It makes the JS-native contract explicit and repeatable across platforms. That enables safer libraries, better upgrades, and less hand-written glue as React Native removes legacy architecture code. Strategically, Codegen turns compatibility into something that can be checked and regenerated instead of guessed. It also pushes library authors toward clearer APIs and fewer platform-specific surprises.
 
 ```ts
 export interface Spec extends TurboModule {
@@ -1785,7 +1785,7 @@ export interface Spec extends TurboModule {
 <a id="g10"></a>
 ### G10. How do interop layers affect migration strategy?
 
-- **Answer:** Interop layers let some libraries keep working while the runtime moves forward, but they are not a reason to postpone real compatibility work forever. A senior plan treats them as a bridge for rollout, not the target architecture.
+- **Answer:** Interop layers let some libraries keep working while the runtime moves forward, but they are not a reason to postpone real compatibility work forever. A senior plan treats them as a bridge for rollout, not the target architecture. The risk is that temporary compatibility becomes permanent technical debt. During migration, track which libraries are truly New Architecture-ready and which are merely surviving through compatibility shims.
 
 ```ts
 const supportsNewArch = global.nativeFabricUIManager != null;
@@ -1797,7 +1797,7 @@ if (!supportsNewArch) throw new Error("Unsupported runtime");
 <a id="g11"></a>
 ### G11. Why did React Native remove more legacy architecture code gradually?
 
-- **Answer:** Gradual removal reduces binary size and complexity while limiting ecosystem breakage. It also gives library maintainers time to move APIs and native assumptions onto the New Architecture path.
+- **Answer:** Gradual removal reduces binary size and complexity while limiting ecosystem breakage. It also gives library maintainers time to move APIs and native assumptions onto the New Architecture path. Removing legacy code too fast would strand production apps; removing it too slowly keeps the runtime harder to maintain. The release strategy balances ecosystem stability with the need to stop carrying two architectures forever.
 
 ```txt
 legacy bridge code removed gradually
@@ -1809,7 +1809,7 @@ interop period -> native modules migrate -> smaller runtime
 <a id="g12"></a>
 ### G12. How do precompiled iOS binaries change build tradeoffs?
 
-- **Answer:** They reduce clean build time by avoiding local compilation of React Native core. The tradeoff is less flexibility when you need to build React Native from source for engine flags, debugging, or custom native changes.
+- **Answer:** They reduce clean build time by avoiding local compilation of React Native core. The tradeoff is less flexibility when you need to build React Native from source for engine flags, debugging, or custom native changes. This is a classic productivity versus control decision. Most teams want faster default builds, while platform teams still need an escape hatch for deep native debugging.
 
 ```ruby
 # Podfile
@@ -1821,7 +1821,7 @@ $RN_USE_PREBUILT_RNCORE = true
 <a id="g13"></a>
 ### G13. What does "DOM-like nodes via refs" mean in modern React Native?
 
-- **Answer:** Native component refs can expose a subset of DOM-style node APIs for traversal and measurement. It improves web alignment while preserving legacy measurement methods for compatibility.
+- **Answer:** Native component refs can expose a subset of DOM-style node APIs for traversal and measurement. It improves web alignment while preserving legacy measurement methods for compatibility. The goal is not to make React Native a browser, but to reduce unnecessary API differences where the concepts are similar. This helps shared tooling and shared mental models across React DOM and React Native.
 
 ```tsx
 const node = ref.current;
@@ -1833,7 +1833,7 @@ node?.measure((_x, _y, width, height) => setSize({ width, height }));
 <a id="g14"></a>
 ### G14. Why are Web Performance APIs useful in React Native?
 
-- **Answer:** APIs like `performance.mark`, `performance.measure`, and `PerformanceObserver` let teams instrument runtime behavior with concepts already used on the web. They also connect better with modern DevTools performance timelines.
+- **Answer:** APIs like `performance.mark`, `performance.measure`, and `PerformanceObserver` let teams instrument runtime behavior with concepts already used on the web. They also connect better with modern DevTools performance timelines. The value is that performance measurements can become portable, named, and comparable instead of ad hoc timestamps. This is especially useful when correlating app startup, navigation, data loading, and user-visible milestones.
 
 ```ts
 performance.mark("app:start");
@@ -1846,7 +1846,7 @@ performance.measure("startup-to-visible", "app:start", "screen:visible");
 <a id="g15"></a>
 ### G15. How do Chrome DevTools Protocol connections matter for React Native tooling?
 
-- **Answer:** CDP lets DevTools and other clients inspect runtime, network, and performance data through a standard protocol. Multiple simultaneous CDP connections allow richer workflows, such as DevTools, editor tools, and agents connected together.
+- **Answer:** CDP lets DevTools and other clients inspect runtime, network, and performance data through a standard protocol. Multiple simultaneous CDP connections allow richer workflows, such as DevTools, editor tools, and agents connected together. Standard protocols matter because they let the ecosystem build tools without every debugger inventing a private integration. For advanced teams, this improves automation, profiling, and remote debugging workflows.
 
 ```json
 {
@@ -1859,7 +1859,7 @@ performance.measure("startup-to-visible", "app:start", "screen:visible");
 <a id="g16"></a>
 ### G16. What is the hard part of building a high-performance native component?
 
-- **Answer:** The hard part is not drawing native UI; it is designing props, events, threading, layout behavior, memory ownership, accessibility, and update semantics that fit React's model across platforms.
+- **Answer:** The hard part is not drawing native UI; it is designing props, events, threading, layout behavior, memory ownership, accessibility, and update semantics that fit React's model across platforms. A native component must behave predictably under repeated renders, prop changes, layout passes, and unmounts. If it feels imperative and stateful from JavaScript, it will be hard to compose and debug.
 
 ```ts
 export type NativeSliderProps = ViewProps & {
@@ -1873,7 +1873,7 @@ export type NativeSliderProps = ViewProps & {
 <a id="g17"></a>
 ### G17. Why can layout animations be difficult in React Native?
 
-- **Answer:** Layout changes are owned by React, Yoga, native views, and animation systems at different points. The new shared animation backend aims to make those updates more consistent and better integrated with New Architecture rendering.
+- **Answer:** Layout changes are owned by React, Yoga, native views, and animation systems at different points. The new shared animation backend aims to make those updates more consistent and better integrated with New Architecture rendering. Layout animation is hard because the thing being animated is also being recalculated by the layout engine. Good implementations need to coordinate state, measurement, mutation, and visual interpolation without fighting React.
 
 ```tsx
 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1885,7 +1885,7 @@ setExpanded((value) => !value);
 <a id="g18"></a>
 ### G18. What is the architectural value of worklets beyond animations?
 
-- **Answer:** Worklets provide a model for running JavaScript off the main JS runtime with lower-latency access to specific data or native capabilities. That matters for gestures, media, vision, crypto, and other responsive compute paths.
+- **Answer:** Worklets provide a model for running JavaScript off the main JS runtime with lower-latency access to specific data or native capabilities. That matters for gestures, media, vision, crypto, and other responsive compute paths. Architecturally, worklets are a way to create specialized JavaScript execution contexts near the work. The price is stricter data passing, serialization, and debugging rules.
 
 ```ts
 const processor = useFrameProcessor((frame) => {
@@ -1899,7 +1899,7 @@ const processor = useFrameProcessor((frame) => {
 <a id="g19"></a>
 ### G19. What should you understand before exposing C++ or Rust to React Native?
 
-- **Answer:** You need a stable JS API, ownership rules, threading model, build integration, error mapping, and platform packaging strategy. The language choice matters less than whether the boundary is safe and maintainable.
+- **Answer:** You need a stable JS API, ownership rules, threading model, build integration, error mapping, and platform packaging strategy. The language choice matters less than whether the boundary is safe and maintainable. C++ or Rust can make performance possible, but they also make crashes and build failures easier to create. The boundary should be narrow, tested, and boring for application developers.
 
 ```cpp
 extern "C" double distance(double x1, double y1, double x2, double y2);
@@ -1910,7 +1910,7 @@ extern "C" double distance(double x1, double y1, double x2, double y2);
 <a id="g20"></a>
 ### G20. Why is React Native moving toward web API alignment?
 
-- **Answer:** Web-aligned APIs reduce conceptual differences between React DOM and React Native, helping shared libraries and developer knowledge transfer. The challenge is preserving native performance and platform semantics rather than copying the browser blindly.
+- **Answer:** Web-aligned APIs reduce conceptual differences between React DOM and React Native, helping shared libraries and developer knowledge transfer. The challenge is preserving native performance and platform semantics rather than copying the browser blindly. Alignment is valuable when the underlying concept maps cleanly, such as abortable requests or performance marks. It becomes harmful if it hides native platform constraints behind a familiar web-shaped API.
 
 ```ts
 const controller = new AbortController();
@@ -1922,7 +1922,7 @@ fetch(url, { signal: controller.signal });
 <a id="g21"></a>
 ### G21. How should you reason about React Compiler in React Native?
 
-- **Answer:** React Compiler can reduce manual memoization pressure, but it does not remove the need for good component boundaries, stable data flow, and native performance profiling. It optimizes React code, not every mobile bottleneck.
+- **Answer:** React Compiler can reduce manual memoization pressure, but it does not remove the need for good component boundaries, stable data flow, and native performance profiling. It optimizes React code, not every mobile bottleneck. Images, layout, JS-native work, GPU pressure, storage, and network still exist outside compiler reach. Compiler-friendly code is usually pure, predictable, and already easier for humans to reason about.
 
 ```tsx
 // Compiler-friendly: pure render from props.
@@ -1936,7 +1936,7 @@ function Price({ cents }: { cents: number }) {
 <a id="g22"></a>
 ### G22. What is a dangerous assumption about Hermes performance?
 
-- **Answer:** Assuming the engine alone fixes slow screens. Hermes can improve startup and JavaScript execution, but layout, images, native work, network, renders, and memory pressure can still dominate user experience.
+- **Answer:** Assuming the engine alone fixes slow screens. Hermes can improve startup and JavaScript execution, but layout, images, native work, network, renders, and memory pressure can still dominate user experience. Engine improvements change one part of the system, not the whole product path. Always profile before claiming an engine, renderer, or library is the bottleneck or the fix.
 
 ```ts
 console.log({
@@ -1950,7 +1950,7 @@ console.log({
 <a id="g23"></a>
 ### G23. How would you debug a crash inside a JSI native module?
 
-- **Answer:** Reproduce with symbols, inspect the native stack, verify runtime lifetime and thread access, reduce the JS call path, and add native assertions around ownership. JavaScript stack traces may be secondary or absent.
+- **Answer:** Reproduce with symbols, inspect the native stack, verify runtime lifetime and thread access, reduce the JS call path, and add native assertions around ownership. JavaScript stack traces may be secondary or absent. Many JSI crashes are caused by using a runtime or host object after its safe lifetime. The debugging mindset is closer to native systems debugging than normal React component debugging.
 
 ```cpp
 assert(runtime_ != nullptr);
@@ -1962,7 +1962,7 @@ assert(jsThreadId_ == std::this_thread::get_id());
 <a id="g24"></a>
 ### G24. Why is React Native on Meta Quest strategically interesting?
 
-- **Answer:** It shows React Native's many-platform model extending to Android-based immersive devices without inventing a separate app model. It also forces better thinking about input, resizable layouts, permissions, and platform capability checks.
+- **Answer:** It shows React Native's many-platform model extending to Android-based immersive devices without inventing a separate app model. It also forces better thinking about input, resizable layouts, permissions, and platform capability checks. The strategic signal is that React Native is not only "iOS plus Android phones." The more targets it supports, the more important capability-driven design becomes.
 
 ```tsx
 const isQuest = Platform.OS === "android" && DeviceInfo.getModel().includes("Quest");
@@ -1973,7 +1973,7 @@ const isQuest = Platform.OS === "android" && DeviceInfo.getModel().includes("Que
 <a id="g25"></a>
 ### G25. How do you design for platforms without Google Mobile Services?
 
-- **Answer:** Avoid assuming Play Services, mobile-only sensors, push implementations, maps, auth providers, or billing APIs are available. Put platform capabilities behind explicit checks and provide alternatives or disabled states.
+- **Answer:** Avoid assuming Play Services, mobile-only sensors, push implementations, maps, auth providers, or billing APIs are available. Put platform capabilities behind explicit checks and provide alternatives or disabled states. This matters for Android forks, enterprise devices, China-market devices, TVs, and immersive platforms. Capability checks are more robust than long lists of platform assumptions.
 
 ```ts
 const hasGoogleServices = await NativeModules.Capabilities.has("gms");
@@ -1985,7 +1985,7 @@ const MapView = hasGoogleServices ? GoogleMap : FallbackMap;
 <a id="g26"></a>
 ### G26. What is the right mental model for React Native 1.0 discussions?
 
-- **Answer:** It is less about a magic rewrite and more about maturity: stable APIs, New Architecture completion, better tooling, predictable releases, and ecosystem compatibility. Interviewers want judgment, not hype.
+- **Answer:** It is less about a magic rewrite and more about maturity: stable APIs, New Architecture completion, better tooling, predictable releases, and ecosystem compatibility. Interviewers want judgment, not hype. A 1.0 conversation should focus on operational confidence: upgrades, docs, libraries, debugging, and long-term support. The platform becoming boring in production is a feature, not a weakness.
 
 ```txt
 1.0 signal: stable APIs
@@ -1998,7 +1998,7 @@ const MapView = hasGoogleServices ? GoogleMap : FallbackMap;
 <a id="g27"></a>
 ### G27. How do release trains affect architecture planning?
 
-- **Answer:** React Native releases move on a schedule with support windows, so teams need regular upgrade capacity. Skipping many releases compounds native dependency risk and makes architecture migrations harder.
+- **Answer:** React Native releases move on a schedule with support windows, so teams need regular upgrade capacity. Skipping many releases compounds native dependency risk and makes architecture migrations harder. Release trains turn upgrades from rare projects into normal maintenance. Teams that reserve time for upgrades avoid the big-bang migration where every dependency breaks at once.
 
 ```json
 {
@@ -2012,7 +2012,7 @@ const MapView = hasGoogleServices ? GoogleMap : FallbackMap;
 <a id="g28"></a>
 ### G28. How would you evaluate a custom renderer or non-mobile target?
 
-- **Answer:** Check host platform primitives, input model, accessibility, layout constraints, native module availability, build pipeline, debugging, and store/runtime rules. The React model can travel, but platform contracts still define the product.
+- **Answer:** Check host platform primitives, input model, accessibility, layout constraints, native module availability, build pipeline, debugging, and store/runtime rules. The React model can travel, but platform contracts still define the product. A custom renderer succeeds only if it maps React updates to host operations predictably. You also need a credible tooling story, because debugging a new target is often harder than rendering the first screen.
 
 ```ts
 type HostConfig = {
@@ -2025,7 +2025,7 @@ type HostConfig = {
 <a id="g29"></a>
 ### G29. What is the deepest reason old bridge-era answers are now weak?
 
-- **Answer:** They describe constraints that are no longer the default runtime reality. Modern React Native interviews focus on Fabric, JSI, TurboModules, Hermes, concurrent React, New Architecture compatibility, and measurable production behavior.
+- **Answer:** They describe constraints that are no longer the default runtime reality. Modern React Native interviews focus on Fabric, JSI, TurboModules, Hermes, concurrent React, New Architecture compatibility, and measurable production behavior. Knowing the old bridge is useful for migrations and history, but treating it as the present leads to bad technical decisions. The best answers explain what changed and what constraints remain.
 
 ```txt
 Old answer: bridge serialization is always the core bottleneck
@@ -2037,7 +2037,7 @@ Modern answer: measure Fabric, JSI, layout, JS, native, GPU
 <a id="g30"></a>
 ### G30. What is the God Mode answer to "How do you make React Native apps fast?"
 
-- **Answer:** Define the user-critical path, measure it on real devices, identify whether JS, native UI, layout, GPU, memory, network, or startup is limiting it, then move or remove work from that path. Architecture gives tools; engineering judgment chooses where to apply them.
+- **Answer:** Define the user-critical path, measure it on real devices, identify whether JS, native UI, layout, GPU, memory, network, or startup is limiting it, then move or remove work from that path. Architecture gives tools; engineering judgment chooses where to apply them. The deepest answer is that performance is a product property, not a library checkbox. Fast apps are built by repeatedly protecting the paths users feel most.
 
 ```ts
 performance.mark("checkout:start");
@@ -2050,7 +2050,7 @@ performance.measure("checkout", "checkout:start");
 <a id="g31"></a>
 ### G31. What actually makes virtualized lists hard?
 
-- **Answer:** The hard parts are measuring dynamic rows, preserving scroll position during inserts, recycling without leaking row state, avoiding blank areas, and coordinating JS work with native scroll. A faster list component still fails if row rendering and image decoding dominate the frame budget.
+- **Answer:** The hard parts are measuring dynamic rows, preserving scroll position during inserts, recycling without leaking row state, avoiding blank areas, and coordinating JS work with native scroll. A faster list component still fails if row rendering and image decoding dominate the frame budget. Lists combine rendering, layout, data updates, and input in one hot path. That is why list bugs often appear as correctness issues and performance issues at the same time.
 
 ```txt
 scroll offset + measured heights + render window + recycled cells
@@ -2062,7 +2062,7 @@ scroll offset + measured heights + render window + recycled cells
 <a id="g32"></a>
 ### G32. Why does FlashList v2 benefit from the New Architecture?
 
-- **Answer:** FlashList v2 can lean on New Architecture behavior such as synchronous measurement and improved rendering coordination. That lets it reduce estimate-driven layout errors that older virtualized approaches had to work around.
+- **Answer:** FlashList v2 can lean on New Architecture behavior such as synchronous measurement and improved rendering coordination. That lets it reduce estimate-driven layout errors that older virtualized approaches had to work around. The key point is not just "faster list," but a better relationship between measurement and rendering. Even then, row purity, keys, images, and update patterns still decide real-world results.
 
 ```tsx
 <FlashList
@@ -2077,7 +2077,7 @@ scroll offset + measured heights + render window + recycled cells
 <a id="g33"></a>
 ### G33. What is the deep tradeoff of React Native for Web?
 
-- **Answer:** React Native for Web gives a shared component model, but the host platform is still the browser. You must account for DOM semantics, CSS layout, accessibility trees, SSR/SEO expectations, bundle splitting, and desktop input patterns.
+- **Answer:** React Native for Web gives a shared component model, but the host platform is still the browser. You must account for DOM semantics, CSS layout, accessibility trees, SSR/SEO expectations, bundle splitting, and desktop input patterns. The deep tradeoff is between shared product velocity and respecting the web as its own platform. The right architecture shares primitives and logic while leaving room for web-native routing and rendering concerns.
 
 ```tsx
 const Link = Platform.OS === "web" ? WebAnchor : NativePressableLink;
@@ -2088,7 +2088,7 @@ const Link = Platform.OS === "web" ? WebAnchor : NativePressableLink;
 <a id="g34"></a>
 ### G34. What is the exact contract between an OTA bundle and native runtime?
 
-- **Answer:** The native runtime owns native modules, generated code, permissions, assets loading, and update client behavior. An OTA bundle is safe only when its JavaScript expects exactly the native capabilities present in the installed binary.
+- **Answer:** The native runtime owns native modules, generated code, permissions, assets loading, and update client behavior. An OTA bundle is safe only when its JavaScript expects exactly the native capabilities present in the installed binary. This is why runtime versioning is a contract, not metadata decoration. Breaking that contract turns a fast JS rollout into a production crash vector.
 
 ```txt
 native runtime version X
@@ -2102,7 +2102,7 @@ native runtime version Y
 <a id="g35"></a>
 ### G35. What can go wrong with AI streaming on mobile?
 
-- **Answer:** Streams can fail through flaky networks, backgrounding, proxy buffering, malformed provider chunks, backpressure, duplicate retries, and partial moderation failures. Robust clients model stream state explicitly instead of treating streaming as a fancy string append.
+- **Answer:** Streams can fail through flaky networks, backgrounding, proxy buffering, malformed provider chunks, backpressure, duplicate retries, and partial moderation failures. Robust clients model stream state explicitly instead of treating streaming as a fancy string append. Mobile adds lifecycle problems like app suspension, navigation away, and changing connectivity mid-generation. The server and client both need idempotency and cancellation semantics.
 
 ```ts
 type StreamState = "idle" | "connecting" | "streaming" | "aborted" | "failed" | "done";
@@ -2113,7 +2113,7 @@ type StreamState = "idle" | "connecting" | "streaming" | "aborted" | "failed" | 
 <a id="g36"></a>
 ### G36. What is the native boundary for local LLM inference?
 
-- **Answer:** The native side should own model loading, memory mapping, accelerator selection, token generation, cancellation, and thermal/memory handling. JavaScript should get a small typed API, progress events, and safe errors, not raw model internals.
+- **Answer:** The native side should own model loading, memory mapping, accelerator selection, token generation, cancellation, and thermal/memory handling. JavaScript should get a small typed API, progress events, and safe errors, not raw model internals. Local inference is closer to media or database infrastructure than to a normal fetch call. A good boundary protects the React app from model lifecycle complexity while still exposing observability.
 
 ```ts
 type LocalLLM = {
@@ -2128,7 +2128,7 @@ type LocalLLM = {
 <a id="g37"></a>
 ### G37. How does Gemma 4 change the local AI conversation for React Native?
 
-- **Answer:** Gemma 4's edge-focused E2B and E4B models make serious on-device AI more realistic, especially through Google AI Edge and LiteRT-style runtimes. The React Native challenge is still packaging, native bindings, device capability checks, and designing features that do useful work with small local models.
+- **Answer:** Gemma 4's edge-focused E2B and E4B models make serious on-device AI more realistic, especially through Google AI Edge and LiteRT-style runtimes. The React Native challenge is still packaging, native bindings, device capability checks, and designing features that do useful work with small local models. The model announcement does not remove mobile constraints like memory, battery, thermal throttling, and app size. The winning product design uses local models where their constraints are a feature, not a liability.
 
 ```txt
 Gemma 4 E2B/E4B -> local capability
