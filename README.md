@@ -1153,7 +1153,7 @@ const status = await LocalModel.getStatus();
 <a id="s01"></a>
 ### S01. How would you plan an upgrade from an old React Native app to current RN?
 
-- **Answer:** First inventory dependencies, native patches, build tools, platform SDK requirements, and New Architecture compatibility. Then upgrade in controlled steps, add telemetry, use the Upgrade Helper, test both platforms, and avoid mixing runtime-changing native updates with unrelated product work.
+- **Answer:** First inventory dependencies, native patches, build tools, platform SDK requirements, and New Architecture compatibility. Then upgrade in controlled steps, add telemetry, use the Upgrade Helper, test both platforms, and avoid mixing runtime-changing native updates with unrelated product work. Senior planning is mostly about reducing unknowns before touching the version number. The safest upgrades have a rollback path, a small diff, and clear ownership for every native dependency that breaks.
 
 ```bash
 npx react-native upgrade
@@ -1166,7 +1166,7 @@ npm test && npm run e2e:smoke
 <a id="s02"></a>
 ### S02. How would you decide whether to use Expo or bare React Native for a new app?
 
-- **Answer:** Start with Expo unless native requirements, build ownership, or platform constraints clearly demand otherwise. Development builds and config plugins cover many custom native needs while preserving faster tooling and release workflows.
+- **Answer:** Start with Expo unless native requirements, build ownership, or platform constraints clearly demand otherwise. Development builds and config plugins cover many custom native needs while preserving faster tooling and release workflows. Bare React Native gives more direct native project control, but it also makes the team own more build and release complexity. A senior answer should frame this as a product and team decision, not a purity argument.
 
 ```bash
 npx create-expo-app MyApp
@@ -1178,7 +1178,7 @@ npx expo prebuild --clean # only when native projects are needed
 <a id="s03"></a>
 ### S03. How do you evaluate a third-party library for a production app?
 
-- **Answer:** Check maintenance, release cadence, New Architecture support, platform coverage, native code quality, issue history, bundle/build impact, and escape plan. A popular library can still be a poor fit if it owns a risky native surface.
+- **Answer:** Check maintenance, release cadence, New Architecture support, platform coverage, native code quality, issue history, bundle/build impact, and escape plan. A popular library can still be a poor fit if it owns a risky native surface. You should also ask how hard it would be to remove or replace later. The more critical the feature, the more you need confidence in maintainers, tests, and compatibility with the app's release cadence.
 
 ```bash
 npm view package-name version time.modified peerDependencies
@@ -1190,7 +1190,7 @@ npm ls package-name
 <a id="s04"></a>
 ### S04. How do you design a screen that must work offline?
 
-- **Answer:** Define which data is authoritative, what can be stale, how writes queue, how conflicts resolve, and how users see sync state. Offline-first is a product contract, not only a storage choice.
+- **Answer:** Define which data is authoritative, what can be stale, how writes queue, how conflicts resolve, and how users see sync state. Offline-first is a product contract, not only a storage choice. The UI should make pending, failed, and synced states visible enough that users can trust the app. You also need migration and recovery rules because local data can outlive app versions and failed network sessions.
 
 ```ts
 await db.transaction(async (tx) => {
@@ -1203,7 +1203,7 @@ await db.transaction(async (tx) => {
 <a id="s05"></a>
 ### S05. How do you approach performance budgets in a React Native app?
 
-- **Answer:** Set budgets for startup, screen transition time, frame drops, memory, network payloads, and crash-free sessions. Track them in CI or telemetry so performance does not depend on occasional manual profiling.
+- **Answer:** Set budgets for startup, screen transition time, frame drops, memory, network payloads, and crash-free sessions. Track them in CI or telemetry so performance does not depend on occasional manual profiling. Budgets turn performance from opinion into an engineering constraint. They also help teams catch regressions early, before a slow screen becomes the new normal.
 
 ```ts
 const budgets = {
@@ -1218,7 +1218,7 @@ const budgets = {
 <a id="s06"></a>
 ### S06. What is your first move when a screen drops frames during gestures?
 
-- **Answer:** Profile the interaction on a release build and identify whether JS, native UI, layout, image decoding, or GPU work is the bottleneck. Then remove work from the critical gesture path instead of blindly memoizing components.
+- **Answer:** Profile the interaction on a release build and identify whether JS, native UI, layout, image decoding, or GPU work is the bottleneck. Then remove work from the critical gesture path instead of blindly memoizing components. Gesture jank is often caused by work that should have happened before the gesture started or outside React render entirely. A senior fix protects the interaction path, not only the component that appears in the stack trace.
 
 ```ts
 performance.mark("drag:start");
@@ -1230,7 +1230,7 @@ gesture.onEnd(() => performance.measure("drag", "drag:start"));
 <a id="s07"></a>
 ### S07. How do React concurrent features matter in React Native?
 
-- **Answer:** They let React prioritize urgent UI work over less urgent rendering, improving responsiveness when used correctly. In React Native, their value depends on the New Architecture and on designing screens that can tolerate interruptible rendering.
+- **Answer:** They let React prioritize urgent UI work over less urgent rendering, improving responsiveness when used correctly. In React Native, their value depends on the New Architecture and on designing screens that can tolerate interruptible rendering. Concurrent features are not a magic performance switch; they require components that are pure enough to render more than once or be interrupted. They are most useful when paired with clear urgent versus non-urgent UI updates.
 
 ```tsx
 const deferredSearch = useDeferredValue(search);
@@ -1242,7 +1242,7 @@ const results = useMemo(() => filter(items, deferredSearch), [items, deferredSea
 <a id="s08"></a>
 ### S08. When would you use `startTransition` in a React Native screen?
 
-- **Answer:** Use it for non-urgent updates such as filtering a large list or updating secondary UI after input. It tells React that immediate interactions should stay responsive while the expensive update can be interrupted.
+- **Answer:** Use it for non-urgent updates such as filtering a large list or updating secondary UI after input. It tells React that immediate interactions should stay responsive while the expensive update can be interrupted. It is not for updates that must be visible immediately, such as typing into the controlled input itself. A good example is keeping text input responsive while search results update in the background.
 
 ```tsx
 startTransition(() => {
@@ -1255,7 +1255,7 @@ startTransition(() => {
 <a id="s09"></a>
 ### S09. How would you prevent a large context from hurting performance?
 
-- **Answer:** Split context by update frequency and responsibility, keep high-churn state local or in a selector-based store, and avoid putting broad objects into providers. Context is fine for stable dependencies but risky for frequently changing app state.
+- **Answer:** Split context by update frequency and responsibility, keep high-churn state local or in a selector-based store, and avoid putting broad objects into providers. Context is fine for stable dependencies but risky for frequently changing app state. Large contexts often hide performance problems because many consumers update even when they only need one field. Senior design keeps provider boundaries small and makes update frequency visible.
 
 ```tsx
 const UserNameContext = createContext<string>("");
@@ -1267,7 +1267,7 @@ const ThemeContext = createContext<Theme>(defaultTheme);
 <a id="s10"></a>
 ### S10. How do you make navigation architecture maintainable?
 
-- **Answer:** Keep route definitions typed, deep-link mappings explicit, and screen ownership clear. Avoid business logic hidden in navigation callbacks; screens should handle domain behavior through services or hooks that can be tested.
+- **Answer:** Keep route definitions typed, deep-link mappings explicit, and screen ownership clear. Avoid business logic hidden in navigation callbacks; screens should handle domain behavior through services or hooks that can be tested. Navigation should describe where the user can go, not become the place where product logic lives. This makes deep links, analytics, auth redirects, and refactors much easier to reason about.
 
 ```ts
 type RootStackParamList = {
@@ -1281,7 +1281,7 @@ type RootStackParamList = {
 <a id="s11"></a>
 ### S11. How would you handle a production-only crash after an OTA update?
 
-- **Answer:** Stop rollout, compare runtime versions, inspect crash reports, verify native API compatibility, and roll back if the JS bundle is unsafe. OTA systems need kill switches and staged rollout because native and JS versions can drift.
+- **Answer:** Stop rollout, compare runtime versions, inspect crash reports, verify native API compatibility, and roll back if the JS bundle is unsafe. OTA systems need kill switches and staged rollout because native and JS versions can drift. The first priority is limiting user impact, not proving the root cause. Once the rollout is contained, use release metadata to identify which binary, channel, and update introduced the crash.
 
 ```bash
 eas update:list --branch production
@@ -1293,7 +1293,7 @@ sentry-cli releases files com.app@42 list
 <a id="s12"></a>
 ### S12. What belongs in a native module instead of JavaScript?
 
-- **Answer:** Use native modules for platform APIs, high-throughput data, background services, secure storage, media processing, or code that must run outside JS thread constraints. Do not move logic native just because the JavaScript code is messy.
+- **Answer:** Use native modules for platform APIs, high-throughput data, background services, secure storage, media processing, or code that must run outside JS thread constraints. Do not move logic native just because the JavaScript code is messy. Native code increases build, testing, and upgrade surface area, so the boundary should be justified by platform capability or performance. Business logic should stay portable unless the platform requires otherwise.
 
 ```ts
 NativeModules.VideoEncoder.encode({
@@ -1307,7 +1307,7 @@ NativeModules.VideoEncoder.encode({
 <a id="s13"></a>
 ### S13. How do you design a native module API?
 
-- **Answer:** Keep the JavaScript contract small, typed, versioned, and platform-aware. Prefer async APIs unless synchronous access is truly needed, and document threading, lifecycle, errors, and permission behavior.
+- **Answer:** Keep the JavaScript contract small, typed, versioned, and platform-aware. Prefer async APIs unless synchronous access is truly needed, and document threading, lifecycle, errors, and permission behavior. A good native module feels boring from JavaScript because edge cases are handled at the boundary. If the API leaks native lifecycle complexity into every caller, the abstraction is probably too thin.
 
 ```ts
 type EncodeResult = { outputUri: string; durationMs: number };
@@ -1319,7 +1319,7 @@ export function encodeVideo(input: EncodeInput): Promise<EncodeResult>;
 <a id="s14"></a>
 ### S14. How do you decide whether a feature should be cross-platform or platform-specific?
 
-- **Answer:** Share product logic and common UI patterns, but respect platform conventions where they affect usability, permissions, navigation, or store policy. Forced sameness often creates worse apps than deliberate platform variation.
+- **Answer:** Share product logic and common UI patterns, but respect platform conventions where they affect usability, permissions, navigation, or store policy. Forced sameness often creates worse apps than deliberate platform variation. Cross-platform should mean shared intent, not identical pixels at all costs. Senior engineers know when one shared abstraction reduces complexity and when it hides real platform differences.
 
 ```tsx
 const Header = Platform.select({
@@ -1333,7 +1333,7 @@ const Header = Platform.select({
 <a id="s15"></a>
 ### S15. How would you lead a New Architecture migration for a team?
 
-- **Answer:** Make dependency compatibility visible, remove abandoned packages, upgrade incrementally, test critical flows in release builds, and add crash/performance monitoring before rollout. The work is mostly risk management, not flipping a flag.
+- **Answer:** Make dependency compatibility visible, remove abandoned packages, upgrade incrementally, test critical flows in release builds, and add crash/performance monitoring before rollout. The work is mostly risk management, not flipping a flag. The migration should have owners, a dependency tracker, and acceptance criteria for both platforms. You want to discover incompatible native assumptions in a controlled branch, not during a release freeze.
 
 ```md
 - [ ] Dependencies support New Architecture
@@ -1346,7 +1346,7 @@ const Header = Platform.select({
 <a id="s16"></a>
 ### S16. How do you handle monorepos with React Native?
 
-- **Answer:** Align package manager behavior with Metro, native build systems, TypeScript, and dependency hoisting rules. The main risks are duplicate React copies, unresolved symlinks, native dependency paths, and slow CI.
+- **Answer:** Align package manager behavior with Metro, native build systems, TypeScript, and dependency hoisting rules. The main risks are duplicate React copies, unresolved symlinks, native dependency paths, and slow CI. Monorepos are powerful when they share domain packages and design systems cleanly, but they punish unclear dependency boundaries. A senior setup makes module resolution predictable for JavaScript, iOS, Android, and tests.
 
 ```js
 // metro.config.js
@@ -1359,7 +1359,7 @@ config.watchFolders = [path.resolve(__dirname, "../packages")];
 <a id="s17"></a>
 ### S17. What is your strategy for app observability?
 
-- **Answer:** Combine JavaScript errors, native crashes, performance traces, network failures, release metadata, and user-impact metrics. Logs alone are not enough; you need correlation by app version, device, OS, and runtime.
+- **Answer:** Combine JavaScript errors, native crashes, performance traces, network failures, release metadata, and user-impact metrics. Logs alone are not enough; you need correlation by app version, device, OS, and runtime. Good observability answers "who is affected, on which build, and after what action." Without that context, teams waste time reproducing issues that only affect one rollout or device class.
 
 ```ts
 Sentry.setContext("runtime", {
@@ -1374,7 +1374,7 @@ Sentry.setContext("runtime", {
 <a id="s18"></a>
 ### S18. How do you secure sensitive mobile data?
 
-- **Answer:** Minimize what is stored, use platform secure storage for tokens, encrypt where appropriate, and assume the client is inspectable. Server-side authorization remains the real security boundary.
+- **Answer:** Minimize what is stored, use platform secure storage for tokens, encrypt where appropriate, and assume the client is inspectable. Server-side authorization remains the real security boundary. Mobile security is mostly about reducing client-side damage, not making the client impossible to inspect. Token lifetime, revocation, device compromise, and logging discipline matter as much as the storage API.
 
 ```ts
 await Keychain.setGenericPassword("session", refreshToken, {
@@ -1387,7 +1387,7 @@ await Keychain.setGenericPassword("session", refreshToken, {
 <a id="s19"></a>
 ### S19. How do you avoid regressions during React Native upgrades?
 
-- **Answer:** Keep upgrade diffs focused, run automated smoke tests, compare startup and key flows, test release builds, and monitor staged rollout. Upgrade work should have rollback planning like any other risky release.
+- **Answer:** Keep upgrade diffs focused, run automated smoke tests, compare startup and key flows, test release builds, and monitor staged rollout. Upgrade work should have rollback planning like any other risky release. Avoid hiding product refactors inside framework upgrades because that makes regressions harder to attribute. A good upgrade PR is boring, traceable, and easy to revert if needed.
 
 ```bash
 npm test
@@ -1400,7 +1400,7 @@ detox test --configuration android.release
 <a id="s20"></a>
 ### S20. How would you choose between Reanimated, Animated, and plain React state for motion?
 
-- **Answer:** Use plain state for simple non-critical UI, Animated for supported native-driven animations, and Reanimated/worklets for gesture-coupled or highly interactive motion. The choice should match latency needs and team maintenance capacity.
+- **Answer:** Use plain state for simple non-critical UI, Animated for supported native-driven animations, and Reanimated/worklets for gesture-coupled or highly interactive motion. The choice should match latency needs and team maintenance capacity. Simple fades or toggles do not need the most powerful animation stack. Complex gestures, physics, and per-frame interaction usually justify worklets because React renders are too slow for that path.
 
 ```tsx
 const progress = useSharedValue(0);
@@ -1412,7 +1412,7 @@ const style = useAnimatedStyle(() => ({ opacity: progress.value }));
 <a id="s21"></a>
 ### S21. How should a team handle Android edge-to-edge changes?
 
-- **Answer:** Treat it as a design and QA change, not only an SDK bump. Verify status bar, navigation bar, safe areas, keyboard, modals, and screens with translucent system UI across supported Android versions.
+- **Answer:** Treat it as a design and QA change, not only an SDK bump. Verify status bar, navigation bar, safe areas, keyboard, modals, and screens with translucent system UI across supported Android versions. Edge-to-edge changes can make previously safe layouts overlap system bars or keyboard surfaces. The right owner is both engineering and design because spacing, contrast, and gesture areas all change.
 
 ```kotlin
 WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -1423,7 +1423,7 @@ WindowCompat.setDecorFitsSystemWindows(window, false)
 <a id="s22"></a>
 ### S22. How do you manage feature flags in React Native?
 
-- **Answer:** Flags should support remote control, typed access, defaults, staged rollout, and cleanup ownership. Avoid flags that create incompatible JavaScript/native combinations unless tied to runtime versioning.
+- **Answer:** Flags should support remote control, typed access, defaults, staged rollout, and cleanup ownership. Avoid flags that create incompatible JavaScript/native combinations unless tied to runtime versioning. A flag is temporary production complexity, so it needs an owner and removal plan. For mobile, default values also matter because users can open the app offline before remote config loads.
 
 ```tsx
 if (flags.newCheckout && runtimeVersion >= 42) {
@@ -1437,7 +1437,7 @@ return <Checkout />;
 <a id="s23"></a>
 ### S23. How do you reason about memory leaks in React Native?
 
-- **Answer:** Look for retained subscriptions, timers, native listeners, large cached data, image memory, and native module lifecycles. Use platform memory tools plus React profiling because leaks can live on either side.
+- **Answer:** Look for retained subscriptions, timers, native listeners, large cached data, image memory, and native module lifecycles. Use platform memory tools plus React profiling because leaks can live on either side. Memory problems may appear as slow navigation, killed background apps, or crashes on low-end Android devices. Senior debugging checks both JavaScript references and native resources that React does not automatically release.
 
 ```tsx
 useEffect(() => {
@@ -1451,7 +1451,7 @@ useEffect(() => {
 <a id="s24"></a>
 ### S24. How do you design for multiple form factors?
 
-- **Answer:** Use responsive layout, safe areas, input-aware interactions, and platform capability checks. Modern React Native can target phones, tablets, desktop-like windows, TV, and Quest-style environments, but assumptions about touch and fixed screen size break quickly.
+- **Answer:** Use responsive layout, safe areas, input-aware interactions, and platform capability checks. Modern React Native can target phones, tablets, desktop-like windows, TV, and Quest-style environments, but assumptions about touch and fixed screen size break quickly. A multi-form-factor app needs layouts that adapt by space and input model, not only by platform string. Test split screen, rotation, large text, keyboard navigation, and pointer interactions where relevant.
 
 ```tsx
 const { width } = useWindowDimensions();
@@ -1463,7 +1463,7 @@ const columns = width >= 768 ? 2 : 1;
 <a id="s25"></a>
 ### S25. How would you introduce on-device AI into a React Native app?
 
-- **Answer:** Start with product value, privacy, model size, latency, battery, fallback, and observability. On-device AI may need native acceleration and careful memory management, so do not treat it as a normal API call.
+- **Answer:** Start with product value, privacy, model size, latency, battery, fallback, and observability. On-device AI may need native acceleration and careful memory management, so do not treat it as a normal API call. You also need to decide how models are downloaded, updated, disabled, or replaced. The feature should degrade gracefully because not every supported device can run the same model well.
 
 ```ts
 const result = await NativeModules.OnDeviceModel.generate({
@@ -1477,7 +1477,7 @@ const result = await NativeModules.OnDeviceModel.generate({
 <a id="s26"></a>
 ### S26. What is the risk of blindly adopting AI-generated React Native code?
 
-- **Answer:** It often ignores platform constraints, native configuration, accessibility, performance, security, and upgrade compatibility. Senior review should force code into established project patterns and verify behavior on real devices.
+- **Answer:** It often ignores platform constraints, native configuration, accessibility, performance, security, and upgrade compatibility. Senior review should force code into established project patterns and verify behavior on real devices. Generated code can be useful for drafts, but it must still pass the same engineering bar as human code. The risk is especially high around permissions, native modules, background behavior, and list performance.
 
 ```tsx
 // Review AI output for platform behavior, not only TypeScript.
@@ -1489,7 +1489,7 @@ const result = await NativeModules.OnDeviceModel.generate({
 <a id="s27"></a>
 ### S27. How do you choose an app release strategy?
 
-- **Answer:** Combine binary releases for native/runtime changes with OTA for safe JavaScript fixes. Add staged rollout, runtime targeting, monitoring, and rollback so releases can be controlled after users install them.
+- **Answer:** Combine binary releases for native/runtime changes with OTA for safe JavaScript fixes. Add staged rollout, runtime targeting, monitoring, and rollback so releases can be controlled after users install them. Binary releases are slower but can change capabilities; OTA is faster but must stay compatible with the installed runtime. A senior release strategy uses both without pretending either one solves every risk.
 
 ```json
 {
@@ -1505,7 +1505,7 @@ const result = await NativeModules.OnDeviceModel.generate({
 <a id="s28"></a>
 ### S28. How do you handle a critical dependency that is unmaintained?
 
-- **Answer:** Assess usage surface, fork cost, replacement options, and security/native risk. If it touches critical native code, plan migration or ownership rather than waiting for it to break during the next RN upgrade.
+- **Answer:** Assess usage surface, fork cost, replacement options, and security/native risk. If it touches critical native code, plan migration or ownership rather than waiting for it to break during the next RN upgrade. Sometimes the right move is to wrap the library behind your own interface before replacing it. The worst outcome is discovering during an urgent upgrade that a core flow depends on abandoned native code.
 
 ```bash
 npm view abandoned-lib time.modified repository.url
@@ -1517,7 +1517,7 @@ npm ls abandoned-lib
 <a id="s29"></a>
 ### S29. What is the senior answer to "React Native vs native"?
 
-- **Answer:** React Native is strong when shared product velocity and cross-platform UI matter, especially with teams invested in React. Pure native may win for platform-first experiences, extreme performance constraints, or deep OS-specific surfaces; the decision is organizational as much as technical.
+- **Answer:** React Native is strong when shared product velocity and cross-platform UI matter, especially with teams invested in React. Pure native may win for platform-first experiences, extreme performance constraints, or deep OS-specific surfaces; the decision is organizational as much as technical. The senior answer avoids tribalism and asks about team skills, product roadmap, native surface area, and release requirements. The best choice is the one the team can operate well for years.
 
 ```txt
 Choose React Native: shared product velocity
@@ -1529,7 +1529,7 @@ Choose native: deep platform-specific surface
 <a id="s30"></a>
 ### S30. What makes someone senior in React Native?
 
-- **Answer:** They can connect React rendering, native platforms, build systems, performance, release safety, and product constraints. They do not just fix screens; they reduce risk across the whole mobile delivery system.
+- **Answer:** They can connect React rendering, native platforms, build systems, performance, release safety, and product constraints. They do not just fix screens; they reduce risk across the whole mobile delivery system. Seniority shows up in how they prevent classes of bugs, guide upgrades, mentor patterns, and make tradeoffs visible. They know when to go deep technically and when to simplify the product path.
 
 ```txt
 Rendering + native + builds + releases + telemetry
@@ -1541,7 +1541,7 @@ Rendering + native + builds + releases + telemetry
 <a id="s31"></a>
 ### S31. How would you evaluate list libraries for a production feed?
 
-- **Answer:** Compare `FlatList`, FlashList, and LegendList with your real row components, images, pagination, inserts, and device mix. Look at frame drops, blank areas, memory, scroll position correctness, bundle/native risk, and maintenance.
+- **Answer:** Compare `FlatList`, FlashList, and LegendList with your real row components, images, pagination, inserts, and device mix. Look at frame drops, blank areas, memory, scroll position correctness, bundle/native risk, and maintenance. Synthetic benchmarks are useful, but production feeds fail through real content and real user behavior. A senior evaluation also includes migration cost and how easy it is for the team to debug list issues later.
 
 ```ts
 performance.mark("feed-scroll:start");
@@ -1555,7 +1555,7 @@ performance.measure("feed-scroll", "feed-scroll:start", "feed-scroll:end");
 <a id="s32"></a>
 ### S32. How would you architect a React Native plus web codebase?
 
-- **Answer:** Share domain logic, data fetching, design tokens, and simple primitives, but allow platform-specific routing, navigation, SEO, and layout where the platforms diverge. A universal app fails when it forces mobile assumptions onto desktop web.
+- **Answer:** Share domain logic, data fetching, design tokens, and simple primitives, but allow platform-specific routing, navigation, SEO, and layout where the platforms diverge. A universal app fails when it forces mobile assumptions onto desktop web. The architecture should make shared code intentional and platform code explicit. That usually means common packages for business logic and tokens, with platform-specific shells for navigation and presentation differences.
 
 ```txt
 shared: hooks, API clients, tokens, simple UI
@@ -1568,7 +1568,7 @@ web: routing, SEO, responsive layout
 <a id="s33"></a>
 ### S33. How do Expo updates relate to native bundles?
 
-- **Answer:** An EAS Update ships a JavaScript bundle and assets to compatible native builds; it does not change native code already installed on the device. Any native module, permission, config plugin, SDK, or runtime change needs a new binary and runtime targeting.
+- **Answer:** An EAS Update ships a JavaScript bundle and assets to compatible native builds; it does not change native code already installed on the device. Any native module, permission, config plugin, SDK, or runtime change needs a new binary and runtime targeting. The runtime version is the compatibility contract between the binary and the update. Senior teams treat update channels and binary rollout as one release system, not separate worlds.
 
 ```bash
 eas build --profile production --platform ios
@@ -1580,7 +1580,7 @@ eas update --channel production --message "JS-only fix"
 <a id="s34"></a>
 ### S34. What is a good AI streaming architecture for mobile?
 
-- **Answer:** Put provider adapters on the backend, stream normalized chunks to the app, and persist enough state to resume or retry safely. The mobile client should focus on rendering, cancellation, offline state, and error recovery.
+- **Answer:** Put provider adapters on the backend, stream normalized chunks to the app, and persist enough state to resume or retry safely. The mobile client should focus on rendering, cancellation, offline state, and error recovery. This keeps provider keys, model routing, moderation, and rate limiting out of the app. It also lets you change AI vendors without shipping a new binary for every provider detail.
 
 ```ts
 type ChatChunk =
@@ -1594,7 +1594,7 @@ type ChatChunk =
 <a id="s35"></a>
 ### S35. When does local LLM inference make product sense?
 
-- **Answer:** Local inference makes sense for privacy-sensitive, offline, low-latency, or cost-sensitive features where small models are good enough. It is a poor fit when quality, long context, tool use, or battery limits require cloud models.
+- **Answer:** Local inference makes sense for privacy-sensitive, offline, low-latency, or cost-sensitive features where small models are good enough. It is a poor fit when quality, long context, tool use, or battery limits require cloud models. The product should define whether "good enough locally" is actually useful to users. Hybrid designs often work best: local for quick/private tasks and cloud for heavier reasoning.
 
 ```txt
 local: private summaries, quick classification, offline assist
@@ -1606,7 +1606,7 @@ cloud: deep reasoning, long context, heavy tool use
 <a id="s36"></a>
 ### S36. How would you design mobile RAG with local documents?
 
-- **Answer:** Keep embeddings, indexing, permissions, and storage limits explicit. For mobile, the hardest parts are incremental indexing, privacy boundaries, memory, and making retrieval fast enough before generation starts.
+- **Answer:** Keep embeddings, indexing, permissions, and storage limits explicit. For mobile, the hardest parts are incremental indexing, privacy boundaries, memory, and making retrieval fast enough before generation starts. Documents can change while the app is backgrounded or offline, so the index needs a lifecycle. You also need clear user consent for what content is indexed and whether anything leaves the device.
 
 ```ts
 const hits = await vectorStore.search(embedding, { topK: 5 });
@@ -1618,7 +1618,7 @@ const answer = await llm.generate({ prompt, context: hits });
 <a id="s37"></a>
 ### S37. How should AI features degrade across devices?
 
-- **Answer:** Use capability checks and remote config to choose local, cloud, hybrid, or disabled modes. Good AI UX explains unavailable states and avoids crashing low-memory devices with a model they cannot run.
+- **Answer:** Use capability checks and remote config to choose local, cloud, hybrid, or disabled modes. Good AI UX explains unavailable states and avoids crashing low-memory devices with a model they cannot run. Degradation should be designed as part of the feature, not added after crashes appear. A senior implementation treats model availability, network, battery, thermal state, and account permissions as runtime inputs.
 
 ```ts
 const mode = supportsLocalLLM ? "local" : flags.cloudAI ? "cloud" : "disabled";
