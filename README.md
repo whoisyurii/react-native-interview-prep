@@ -93,7 +93,7 @@ The levels are not about job titles only:
 <a id="j01"></a>
 ### J01. What is React Native actually rendering?
 
-- **Answer:** React Native renders native platform views, not HTML. Your React components describe UI in JavaScript, and React Native turns that tree into iOS and Android native view trees through the Fabric renderer.
+- **Answer:** React Native renders native platform views, not HTML. Your React components describe UI in JavaScript, and React Native turns that tree into iOS and Android native view trees through the Fabric renderer. This is why React Native apps can feel like platform apps while still using React concepts. A good junior answer should not say it is a WebView unless the app explicitly embeds web content.
 
 ```tsx
 import { Text, View } from "react-native";
@@ -108,7 +108,7 @@ export function Hello() {
 <a id="j02"></a>
 ### J02. What is the difference between `View`, `Text`, and `ScrollView`?
 
-- **Answer:** `View` is the basic layout container, `Text` is required for rendering text, and `ScrollView` renders all of its children inside a scrollable area. For long or dynamic lists, prefer `FlatList` or `SectionList` because they virtualize rows.
+- **Answer:** `View` is the basic layout container, `Text` is required for rendering text, and `ScrollView` renders all of its children inside a scrollable area. `View` is similar to a generic box, while `Text` has special nesting and styling rules. `ScrollView` is fine for small static content, but it becomes expensive when the number of children grows because everything is mounted at once. For long or dynamic lists, prefer `FlatList` or `SectionList` because they virtualize rows.
 
 ```tsx
 <View style={{ padding: 16 }}>
@@ -122,7 +122,7 @@ export function Hello() {
 <a id="j03"></a>
 ### J03. Why can a component re-render even when the screen looks unchanged?
 
-- **Answer:** React re-renders when state, props, or context used by a component changes. The visual result may be identical, but React still has to re-run render logic to compare what changed.
+- **Answer:** React re-renders when state, props, or context used by a component changes. The visual result may be identical, but React still has to re-run render logic to compare what changed. Re-rendering is not automatically bad; it becomes a problem when the render work is expensive or happens too often. The first step is usually to understand why the component rendered before trying to memoize it.
 
 ```tsx
 function Row({ title }: { title: string }) {
@@ -136,7 +136,7 @@ function Row({ title }: { title: string }) {
 <a id="j04"></a>
 ### J04. When would you use `useState` instead of `useRef`?
 
-- **Answer:** Use `useState` when a value should trigger a re-render. Use `useRef` for mutable values that must persist between renders without updating the UI, such as timers, imperative handles, or previous values.
+- **Answer:** Use `useState` when a value should trigger a re-render. Use `useRef` for mutable values that must persist between renders without updating the UI, such as timers, imperative handles, or previous values. A common mistake is storing visible UI data in a ref and then wondering why the screen did not update. If changing the value should be seen by the user immediately, it is usually state.
 
 ```tsx
 const [count, setCount] = useState(0); // updates UI
@@ -149,7 +149,7 @@ timerRef.current = setTimeout(() => setCount(c => c + 1), 1000);
 <a id="j05"></a>
 ### J05. What is the main risk of putting expensive work directly inside render?
 
-- **Answer:** Render may run often, so expensive work there can block the JavaScript thread and make gestures, navigation, or animations feel slow. Move heavy work outside render, memoize carefully, or push it to a background/native path when needed.
+- **Answer:** Render may run often, so expensive work there can block the JavaScript thread and make gestures, navigation, or animations feel slow. Move heavy work outside render, memoize carefully, or push it to a background/native path when needed. This matters more on real devices, where CPU and memory are tighter than on a laptop. The best fix is usually to reduce unnecessary work, not to wrap every line in `useMemo`.
 
 ```tsx
 const total = useMemo(() => {
@@ -162,7 +162,7 @@ const total = useMemo(() => {
 <a id="j06"></a>
 ### J06. Why should list items have stable keys?
 
-- **Answer:** Stable keys let React match items between renders. Index keys break when items are inserted, removed, or reordered, which can cause wrong state reuse, visual glitches, and unnecessary row work.
+- **Answer:** Stable keys let React match items between renders. Index keys break when items are inserted, removed, or reordered, which can cause wrong state reuse, visual glitches, and unnecessary row work. In React Native lists, bad keys can also make scroll behavior and row updates feel inconsistent. Use a real unique ID from the data model whenever possible.
 
 ```tsx
 <FlatList
@@ -177,7 +177,7 @@ const total = useMemo(() => {
 <a id="j07"></a>
 ### J07. Why is `FlatList` usually better than `ScrollView` for feeds?
 
-- **Answer:** `ScrollView` renders every child, which can waste memory and startup time. `FlatList` renders a window of visible and nearby items, trading some complexity for much better scalability.
+- **Answer:** `ScrollView` renders every child, which can waste memory and startup time. `FlatList` renders a window of visible and nearby items, trading some complexity for much better scalability. This is why feeds, chats, search results, and large settings screens usually belong in virtualized lists. The tradeoff is that you must think about keys, row height, pagination, and empty/loading states more carefully.
 
 ```tsx
 <FlatList
@@ -192,7 +192,7 @@ const total = useMemo(() => {
 <a id="j08"></a>
 ### J08. What does `extraData` do in `FlatList`?
 
-- **Answer:** `FlatList` is optimized with shallow prop checks. `extraData` tells it that something outside `data`, such as selected item state, should cause visible rows to update.
+- **Answer:** `FlatList` is optimized with shallow prop checks. `extraData` tells it that something outside `data`, such as selected item state, should cause visible rows to update. Without it, a row can appear stale even though your state changed correctly. Use it for small external values, but avoid passing a huge object that changes identity on every render.
 
 ```tsx
 <FlatList
@@ -207,7 +207,7 @@ const total = useMemo(() => {
 <a id="j09"></a>
 ### J09. What is a controlled input?
 
-- **Answer:** A controlled input gets its value from React state and updates that state through callbacks like `onChangeText`. It gives predictable UI state, but excessive updates in large forms should be handled carefully.
+- **Answer:** A controlled input gets its value from React state and updates that state through callbacks like `onChangeText`. It gives predictable UI state, validation, and form submission behavior because React owns the current value. The downside is that every keystroke can trigger updates, so large forms should avoid unnecessary parent re-renders. For simple forms, controlled inputs are usually the clearest default.
 
 ```tsx
 const [email, setEmail] = useState("");
@@ -220,7 +220,7 @@ const [email, setEmail] = useState("");
 <a id="j10"></a>
 ### J10. What should you check before saying a React Native app is slow?
 
-- **Answer:** Check a release build on a real device, reproduce the slow path, and profile where time is spent. Development builds, simulators, console logs, and remote tooling can distort performance.
+- **Answer:** Check a release build on a real device, reproduce the slow path, and profile where time is spent. Development builds, simulators, console logs, and remote tooling can distort performance. You should also separate startup slowness, render slowness, list slowness, and network slowness because they have different fixes. A strong answer starts with measurement instead of guessing.
 
 ```bash
 npx react-native run-ios --mode Release
@@ -232,7 +232,7 @@ npx react-native run-android --mode release
 <a id="j11"></a>
 ### J11. What is the difference between `useEffect` and `useLayoutEffect`?
 
-- **Answer:** `useEffect` runs after paint and is right for data fetching, subscriptions, and side effects. `useLayoutEffect` runs before paint and is useful when layout measurement must update UI without visible flicker.
+- **Answer:** `useEffect` runs after paint and is right for data fetching, subscriptions, and side effects. `useLayoutEffect` runs before paint and is useful when layout measurement must update UI without visible flicker. Most junior code should use `useEffect` by default because it does not block painting. Reach for `useLayoutEffect` only when the timing matters for what the user sees.
 
 ```tsx
 useEffect(() => subscribeToMessages(), []);
@@ -247,7 +247,7 @@ useLayoutEffect(() => {
 <a id="j12"></a>
 ### J12. Why can `useEffect` cause bugs with stale data?
 
-- **Answer:** Effects capture values from the render they belong to. If dependencies are missing or callbacks are not structured well, the effect can run with old props, state, or closures.
+- **Answer:** Effects capture values from the render they belong to. If dependencies are missing or callbacks are not structured well, the effect can run with old props, state, or closures. That can cause bugs like tracking the wrong user, using an old token, or ignoring the latest input. Treat the dependency array as part of the effect contract, not as something to silence lint warnings.
 
 ```tsx
 useEffect(() => {
@@ -260,7 +260,7 @@ useEffect(() => {
 <a id="j13"></a>
 ### J13. What is the practical use of `React.memo`?
 
-- **Answer:** `React.memo` skips re-rendering a component when its props are shallowly equal. It helps for expensive child components, but it is not a default fix and can be useless if props change identity every render.
+- **Answer:** `React.memo` skips re-rendering a component when its props are shallowly equal. It helps for expensive child components, but it is not a default fix and can be useless if props change identity every render. For example, passing a newly created object or function each time can defeat memoization. Use it when profiling or component structure shows that a child is re-rendering unnecessarily.
 
 ```tsx
 const UserRow = React.memo(function UserRow({ name }: { name: string }) {
@@ -273,7 +273,7 @@ const UserRow = React.memo(function UserRow({ name }: { name: string }) {
 <a id="j14"></a>
 ### J14. When is `useCallback` useful?
 
-- **Answer:** `useCallback` is useful when function identity matters, such as passing callbacks to memoized children or subscription APIs. It does not make the function itself faster.
+- **Answer:** `useCallback` is useful when function identity matters, such as passing callbacks to memoized children or subscription APIs. It does not make the function itself faster. Its value is that the same callback reference can be reused between renders when dependencies do not change. If no child or hook cares about function identity, `useCallback` can add noise without benefit.
 
 ```tsx
 const onPress = useCallback(() => {
@@ -286,7 +286,7 @@ const onPress = useCallback(() => {
 <a id="j15"></a>
 ### J15. How do you handle platform-specific UI differences?
 
-- **Answer:** Use platform checks, platform-specific files like `Button.ios.tsx` and `Button.android.tsx`, or shared abstractions that hide platform details. Keep differences small and explicit so the codebase does not fork into two apps.
+- **Answer:** Use platform checks, platform-specific files like `Button.ios.tsx` and `Button.android.tsx`, or shared abstractions that hide platform details. Keep differences small and explicit so the codebase does not fork into two apps. Platform differences are normal for permissions, navigation, typography, gestures, and system UI. The goal is to share product logic while respecting how each platform behaves.
 
 ```tsx
 const hitSlop = Platform.select({
@@ -300,7 +300,7 @@ const hitSlop = Platform.select({
 <a id="j16"></a>
 ### J16. What is a safe area and why does it matter?
 
-- **Answer:** Safe areas protect content from notches, home indicators, rounded corners, and system UI. A polished app uses safe-area-aware layout instead of hardcoded padding.
+- **Answer:** Safe areas protect content from notches, home indicators, rounded corners, and system UI. A polished app uses safe-area-aware layout instead of hardcoded padding. Hardcoded values often fail across iPhone models, Android devices, tablets, and landscape orientation. Thinking about safe areas early prevents buttons and headers from being hidden by the OS.
 
 ```tsx
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -315,7 +315,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 <a id="j17"></a>
 ### J17. What makes touch handling different from web click handling?
 
-- **Answer:** Mobile touch needs feedback, cancellation, gesture conflict handling, and accessibility semantics. Components like `Pressable` model press states more accurately than treating everything like a browser click.
+- **Answer:** Mobile touch needs feedback, cancellation, gesture conflict handling, and accessibility semantics. Components like `Pressable` model press states more accurately than treating everything like a browser click. A touch can start, move, cancel, or compete with a scroll gesture, so mobile interactions need more care. Good touch UI also provides a large enough hit target and visible feedback.
 
 ```tsx
 <Pressable onPress={save} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
@@ -328,7 +328,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 <a id="j18"></a>
 ### J18. What should every accessible button-like component provide?
 
-- **Answer:** It should expose the right role, label, state, focus behavior, and hit target. A custom `View` with `onPress` is not enough unless you add the missing accessibility semantics.
+- **Answer:** It should expose the right role, label, state, focus behavior, and hit target. A custom `View` with `onPress` is not enough unless you add the missing accessibility semantics. Screen readers need to know what the control is and what action it performs. Accessibility is not a bonus feature; it is part of making the component usable and testable.
 
 ```tsx
 <Pressable accessibilityRole="button" accessibilityLabel="Submit form" onPress={submit}>
@@ -341,7 +341,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 <a id="j19"></a>
 ### J19. Where should API secrets be stored?
 
-- **Answer:** Do not ship secrets in the mobile app bundle. Public config can live in app config, but real secrets belong on a server because users can inspect app binaries and JavaScript bundles.
+- **Answer:** Do not ship secrets in the mobile app bundle. Public config can live in app config, but real secrets belong on a server because users can inspect app binaries and JavaScript bundles. Anything in the client should be treated as public, including values hidden in environment files at build time. The app should call your backend, and the backend should call secret-protected services.
 
 ```ts
 // Client calls your backend, not a private provider secret directly.
@@ -353,7 +353,7 @@ await fetch("https://api.example.com/payments/session", { method: "POST" });
 <a id="j20"></a>
 ### J20. How should you handle loading, empty, and error states?
 
-- **Answer:** Treat them as first-class UI states, not afterthoughts. A production screen should clearly represent loading, empty data, recoverable errors, and retry paths.
+- **Answer:** Treat them as first-class UI states, not afterthoughts. A production screen should clearly represent loading, empty data, recoverable errors, and retry paths. These states are often where users decide whether the app feels reliable. Designing them explicitly also makes the component easier to test because every data state has a visible outcome.
 
 ```tsx
 if (isLoading) return <ActivityIndicator />;
@@ -367,7 +367,7 @@ return <ItemList items={items} />;
 <a id="j21"></a>
 ### J21. What is the difference between local state and server state?
 
-- **Answer:** Local state belongs only to the UI, like an open modal or selected tab. Server state comes from remote data and needs caching, invalidation, retries, and synchronization rules.
+- **Answer:** Local state belongs only to the UI, like an open modal or selected tab. Server state comes from remote data and needs caching, invalidation, retries, and synchronization rules. Mixing the two can create stale screens or duplicated sources of truth. A good mental model is that local state answers "what is the UI doing now," while server state answers "what data do we know from outside the app."
 
 ```tsx
 const [isSheetOpen, setSheetOpen] = useState(false); // local UI state
@@ -379,7 +379,7 @@ const queryKey = ["user", userId]; // server-state cache identity
 <a id="j22"></a>
 ### J22. Why should network requests be cancelled or ignored after unmount?
 
-- **Answer:** A response may arrive after the screen is gone. You should avoid setting state on unmounted screens and prevent stale responses from overwriting newer data.
+- **Answer:** A response may arrive after the screen is gone. You should avoid setting state on unmounted screens and prevent stale responses from overwriting newer data. This can happen when users navigate quickly, change filters, or lose network connection. Cancellation or stale-response guards make async UI safer and less surprising.
 
 ```tsx
 useEffect(() => {
@@ -394,7 +394,7 @@ useEffect(() => {
 <a id="j23"></a>
 ### J23. What is deep linking?
 
-- **Answer:** Deep linking opens a specific app screen from a URL or external intent. A good implementation maps URLs to navigation state and handles cold start, warm start, and invalid links.
+- **Answer:** Deep linking opens a specific app screen from a URL or external intent. A good implementation maps URLs to navigation state and handles cold start, warm start, and invalid links. It is used for push notifications, email links, auth callbacks, and shared content. The app should also handle missing or malformed parameters gracefully.
 
 ```ts
 const linking = {
@@ -408,7 +408,7 @@ const linking = {
 <a id="j24"></a>
 ### J24. What is the difference between Expo Go and a development build?
 
-- **Answer:** Expo Go is a shared client for fast iteration with supported Expo APIs. A development build is your own app binary, so it can include custom native modules and app-specific native configuration.
+- **Answer:** Expo Go is a shared client for fast iteration with supported Expo APIs. A development build is your own app binary, so it can include custom native modules and app-specific native configuration. Expo Go is great for learning and early prototypes, but it cannot contain every native dependency your app may need. Once native behavior matters, a development build is the realistic testing environment.
 
 ```json
 {
@@ -423,7 +423,7 @@ const linking = {
 <a id="j25"></a>
 ### J25. Why do React Native upgrades need testing on both iOS and Android?
 
-- **Answer:** React Native sits across JavaScript, native code, build tools, and platform SDKs. An upgrade can be fine on one platform and break native dependencies, permissions, layout, or build settings on the other.
+- **Answer:** React Native sits across JavaScript, native code, build tools, and platform SDKs. An upgrade can be fine on one platform and break native dependencies, permissions, layout, or build settings on the other. iOS and Android have different compilers, OS rules, native APIs, and device behavior. A serious upgrade check includes both platforms in release-like conditions.
 
 ```bash
 npx react-native run-ios --mode Release
@@ -436,7 +436,7 @@ npm test
 <a id="j26"></a>
 ### J26. What is Hermes?
 
-- **Answer:** Hermes is the JavaScript engine optimized for React Native. Modern React Native uses Hermes by default, and Hermes V1 is now the default engine in current releases.
+- **Answer:** Hermes is the JavaScript engine optimized for React Native. Modern React Native uses Hermes by default, and Hermes V1 is now the default engine in current releases. The engine affects startup, bytecode, debugging, and runtime behavior, so it is part of the production environment. Junior candidates do not need internals, but they should know Hermes is the normal modern baseline.
 
 ```ts
 const isHermes = !!global.HermesInternal;
@@ -448,7 +448,7 @@ console.log({ isHermes });
 <a id="j27"></a>
 ### J27. What is React Native DevTools used for?
 
-- **Answer:** React Native DevTools is used to inspect components, debug JavaScript, inspect network activity, and profile performance. Modern interviews expect DevTools knowledge instead of old remote debugging habits.
+- **Answer:** React Native DevTools is used to inspect components, debug JavaScript, inspect network activity, and profile performance. Modern interviews expect DevTools knowledge instead of old remote debugging habits. It helps you move from "the app feels slow" to a concrete render, network, or JavaScript problem. The important habit is to debug with tools before changing code blindly.
 
 ```ts
 performance.mark("feed:start");
@@ -462,7 +462,7 @@ performance.measure("feed", "feed:start", "feed:end");
 <a id="j28"></a>
 ### J28. Why should you avoid heavy console logging in mobile apps?
 
-- **Answer:** Logging can slow JavaScript execution, make profiling noisy, and leak sensitive details. Keep logs structured, environment-aware, and removed or reduced in production.
+- **Answer:** Logging can slow JavaScript execution, make profiling noisy, and leak sensitive details. Keep logs structured, environment-aware, and removed or reduced in production. Logs inside render paths, list rows, or tight loops are especially risky because they can run many times. Use logs for investigation, but do not let them become part of normal app behavior.
 
 ```ts
 if (__DEV__) {
@@ -475,7 +475,7 @@ if (__DEV__) {
 <a id="j29"></a>
 ### J29. What is an error boundary?
 
-- **Answer:** An error boundary catches rendering errors below it and shows fallback UI instead of crashing the whole React tree. It does not replace native crash reporting or handling async errors.
+- **Answer:** An error boundary catches rendering errors below it and shows fallback UI instead of crashing the whole React tree. It does not replace native crash reporting or handling async errors. Error boundaries are useful around risky feature areas so one broken subtree does not destroy the whole screen. You still need logging so the team can see and fix the underlying issue.
 
 ```tsx
 class Boundary extends React.Component<Props, { failed: boolean }> {
@@ -490,7 +490,7 @@ class Boundary extends React.Component<Props, { failed: boolean }> {
 <a id="j30"></a>
 ### J30. What makes a pull request in React Native safer to review?
 
-- **Answer:** Small scope, typed props, platform screenshots, tested edge states, and clear upgrade notes make review easier. For UI work, reviewers should see both iOS and Android behavior when possible.
+- **Answer:** Small scope, typed props, platform screenshots, tested edge states, and clear upgrade notes make review easier. For UI work, reviewers should see both iOS and Android behavior when possible. A safe pull request explains what changed, how it was tested, and which states were considered. This is especially important in React Native because a visual change can behave differently across platforms.
 
 ```md
 - [ ] iOS screenshot
@@ -503,7 +503,7 @@ class Boundary extends React.Component<Props, { failed: boolean }> {
 <a id="j31"></a>
 ### J31. When is `FlatList` still the right choice?
 
-- **Answer:** Use `FlatList` when the list is simple, medium-sized, and already performs well in release builds. Reaching for FlashList or LegendList only makes sense after you can point to measured list problems.
+- **Answer:** Use `FlatList` when the list is simple, medium-sized, and already performs well in release builds. Reaching for FlashList or LegendList only makes sense after you can point to measured list problems. `FlatList` is built in, well understood, and often good enough for straightforward screens. A junior engineer should not replace core components just because a newer library exists.
 
 ```tsx
 <FlatList
@@ -518,7 +518,7 @@ class Boundary extends React.Component<Props, { failed: boolean }> {
 <a id="j32"></a>
 ### J32. What is React Native for Web?
 
-- **Answer:** React Native for Web maps React Native primitives like `View`, `Text`, and `Pressable` to web elements. It is useful for shared UI and product logic, but browser layout, accessibility, SEO, and routing still need web-specific judgment.
+- **Answer:** React Native for Web maps React Native primitives like `View`, `Text`, and `Pressable` to web elements. It is useful for shared UI and product logic, but browser layout, accessibility, SEO, and routing still need web-specific judgment. The same component can often run on web, iOS, and Android, but not every interaction should be identical. Good cross-platform code shares what is genuinely common and isolates platform-specific behavior.
 
 ```tsx
 import { Platform, Text } from "react-native";
@@ -532,7 +532,7 @@ return <Text>{label}</Text>;
 <a id="j33"></a>
 ### J33. Why do Expo development builds matter?
 
-- **Answer:** Development builds are custom app binaries with your native modules and config included. They keep Expo's workflow while letting you test native behavior that Expo Go cannot contain.
+- **Answer:** Development builds are custom app binaries with your native modules and config included. They keep Expo's workflow while letting you test native behavior that Expo Go cannot contain. This matters for libraries that require config plugins, custom permissions, native SDKs, or background capabilities. In interviews, the key distinction is that Expo can still be used with custom native code through development builds.
 
 ```bash
 npx expo install expo-dev-client
@@ -544,7 +544,7 @@ npx expo run:ios
 <a id="j34"></a>
 ### J34. What is streaming in an AI chat UI?
 
-- **Answer:** Streaming means the app renders tokens or chunks as they arrive instead of waiting for the full answer. It improves perceived latency, but the UI must handle cancellation, partial text, errors, and retry.
+- **Answer:** Streaming means the app renders tokens or chunks as they arrive instead of waiting for the full answer. It improves perceived latency, but the UI must handle cancellation, partial text, errors, and retry. From a user perspective, streaming makes an AI feature feel responsive even when the full answer takes time. From an engineering perspective, partial data is still real state and needs careful handling.
 
 ```ts
 for await (const chunk of chatStream) {
@@ -557,7 +557,7 @@ for await (const chunk of chatStream) {
 <a id="j35"></a>
 ### J35. What is a local LLM in a mobile app?
 
-- **Answer:** A local LLM runs inference on the user's device instead of calling a cloud API. It can improve privacy and offline behavior, but it costs storage, memory, battery, startup time, and native integration effort.
+- **Answer:** A local LLM runs inference on the user's device instead of calling a cloud API. It can improve privacy and offline behavior, but it costs storage, memory, battery, startup time, and native integration effort. Small local models are useful for constrained tasks, not as a magic replacement for every cloud model. The app should check device capability and provide a fallback when local inference is not realistic.
 
 ```ts
 const reply = await NativeModules.LocalLLM.generate({
