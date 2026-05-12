@@ -16,7 +16,9 @@ Thanks for improving this React Native interview guide.
 <a id="level-next"></a>
 ### LEVEL. What is the interview question?
 
-**Answer:** Short answer with a concrete caveat or tradeoff.
+- **Answer:** Short answer with a concrete caveat or tradeoff.
+
+[⬆️ Jump back](#section-anchor)
 ```
 
 ## Level Guide
