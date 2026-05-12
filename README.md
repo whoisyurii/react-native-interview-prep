@@ -615,7 +615,7 @@ const reply = await NativeModules.LocalLLM.generate({
 <a id="m01"></a>
 ### M01. What changed when React Native became New Architecture-only?
 
-- **Answer:** Apps can no longer rely on opting back into the legacy architecture in current React Native. Fabric, TurboModules, Codegen, JSI, and Hermes are now the practical baseline for modern app and library work.
+- **Answer:** Apps can no longer rely on opting back into the legacy architecture in current React Native. Fabric, TurboModules, Codegen, JSI, and Hermes are now the practical baseline for modern app and library work. This changes how you evaluate dependencies because old native modules can become upgrade blockers. A middle-level engineer should understand the architecture enough to spot compatibility risk before it reaches CI or production.
 
 ```tsx
 // Current RN apps should assume New Architecture APIs are the path.
@@ -627,7 +627,7 @@ import codegenNativeComponent from "react-native/Libraries/Utilities/codegenNati
 <a id="m02"></a>
 ### M02. What problem does Fabric solve?
 
-- **Answer:** Fabric is the modern renderer for React Native. It improves how React coordinates native view creation, layout, commits, and mounting, enabling concurrent React features and more predictable native rendering.
+- **Answer:** Fabric is the modern renderer for React Native. It improves how React coordinates native view creation, layout, commits, and mounting, enabling concurrent React features and more predictable native rendering. In practice, this means layout and rendering behavior are more tightly integrated with React itself. You do not need to know every C++ detail at middle level, but you should know Fabric is the renderer behind modern RN UI.
 
 ```tsx
 useLayoutEffect(() => {
@@ -640,7 +640,7 @@ useLayoutEffect(() => {
 <a id="m03"></a>
 ### M03. What problem do TurboModules solve?
 
-- **Answer:** TurboModules modernize native module access with Codegen and JSI-based interop. They improve startup and type safety by loading modules lazily and exposing a better-defined JavaScript-to-native contract.
+- **Answer:** TurboModules modernize native module access with Codegen and JSI-based interop. They improve startup and type safety by loading modules lazily and exposing a better-defined JavaScript-to-native contract. This matters when a feature depends on camera, storage, payments, media, or device APIs. The key interview point is that native access is now more typed and direct than the old bridge model.
 
 ```ts
 export interface Spec extends TurboModule {
@@ -654,7 +654,7 @@ export default TurboModuleRegistry.getEnforcing<Spec>("DeviceInfo");
 <a id="m04"></a>
 ### M04. Why is Codegen important?
 
-- **Answer:** Codegen turns typed JavaScript or TypeScript specs into native interface glue. This reduces hand-written mismatch bugs and gives native modules and components a clearer cross-platform contract.
+- **Answer:** Codegen turns typed JavaScript or TypeScript specs into native interface glue. This reduces hand-written mismatch bugs and gives native modules and components a clearer cross-platform contract. It also makes library compatibility easier to reason about because the JS-native boundary is explicit. If the spec changes, native code must be regenerated and tested on both platforms.
 
 ```ts
 export interface NativeProps extends ViewProps {
@@ -668,7 +668,7 @@ export interface NativeProps extends ViewProps {
 <a id="m05"></a>
 ### M05. What does JSI allow that the old bridge model made hard?
 
-- **Answer:** JSI allows JavaScript and native code to hold references and call into each other without JSON-style serialization for every operation. That matters for high-frequency or large-data work like frames, audio, databases, or custom native engines.
+- **Answer:** JSI allows JavaScript and native code to hold references and call into each other without JSON-style serialization for every operation. That matters for high-frequency or large-data work like frames, audio, databases, or custom native engines. The benefit is lower overhead and more powerful native integrations. The tradeoff is that lifetime, threading, and native crashes become more important to understand.
 
 ```ts
 // JSI-friendly APIs avoid serializing huge payloads every frame.
@@ -680,7 +680,7 @@ nativeFrameProcessor.install(workletRuntime);
 <a id="m06"></a>
 ### M06. Does enabling the New Architecture automatically make an app fast?
 
-- **Answer:** No. It unlocks better capabilities, but the app still needs good rendering, data, image, list, and animation choices. You must profile the actual bottleneck.
+- **Answer:** No. It unlocks better capabilities, but the app still needs good rendering, data, image, list, and animation choices. You must profile the actual bottleneck. New Architecture can remove some old limits, but bad React patterns, huge images, slow network calls, or heavy synchronous JS can still make the app feel poor. Treat architecture as an enabler, not a performance guarantee.
 
 ```tsx
 console.time("expensive-render");
@@ -693,7 +693,7 @@ console.timeEnd("expensive-render");
 <a id="m07"></a>
 ### M07. How do you approach a slow `FlatList`?
 
-- **Answer:** Measure first, then check row complexity, stable keys, `renderItem` identity, `extraData`, item memoization, images, pagination, and fixed-size optimizations like `getItemLayout`. Tune virtualization props only after you know whether the problem is CPU, memory, or blank areas.
+- **Answer:** Measure first, then check row complexity, stable keys, `renderItem` identity, `extraData`, item memoization, images, pagination, and fixed-size optimizations like `getItemLayout`. Tune virtualization props only after you know whether the problem is CPU, memory, or blank areas. Many list issues come from expensive row components rather than the list component itself. A good answer distinguishes render cost from scroll window configuration.
 
 ```tsx
 <FlatList
@@ -708,7 +708,7 @@ console.timeEnd("expensive-render");
 <a id="m08"></a>
 ### M08. Why can nested `ScrollView` and `FlatList` be a problem?
 
-- **Answer:** A same-direction parent `ScrollView` can break the list's bounded viewport assumptions. That can disable useful virtualization behavior and cause memory or rendering problems.
+- **Answer:** A same-direction parent `ScrollView` can break the list's bounded viewport assumptions. That can disable useful virtualization behavior and cause memory or rendering problems. Usually the better pattern is to make the list own the scroll and use header/footer components for surrounding content. If you really need nested scrolling, you should be explicit about direction, height constraints, and platform behavior.
 
 ```tsx
 // Prefer one virtualized owner for the vertical scroll.
@@ -720,7 +720,7 @@ console.timeEnd("expensive-render");
 <a id="m09"></a>
 ### M09. When should you consider FlashList or another list library?
 
-- **Answer:** Consider it when built-in lists cannot meet measured performance needs or when your list has complex dynamic measurement requirements. Still validate compatibility, maintenance, and New Architecture support before adopting it.
+- **Answer:** Consider it when built-in lists cannot meet measured performance needs or when your list has complex dynamic measurement requirements. Still validate compatibility, maintenance, and New Architecture support before adopting it. A list library can reduce blank areas or measurement pain, but it cannot fix huge rows, oversized images, or unstable props by itself. Adoption should come with before-and-after profiling.
 
 ```tsx
 <FlashList
@@ -735,7 +735,7 @@ console.timeEnd("expensive-render");
 <a id="m10"></a>
 ### M10. How do worklets help performance?
 
-- **Answer:** Worklets can run selected JavaScript logic off the main JS thread in a separate runtime. They are useful for latency-sensitive gestures, animations, and some compute-heavy paths that should not block app interaction.
+- **Answer:** Worklets can run selected JavaScript logic off the main JS thread in a separate runtime. They are useful for latency-sensitive gestures, animations, and some compute-heavy paths that should not block app interaction. The important nuance is that worklet code has different execution rules and data-sharing constraints. Use it for critical interaction paths, not as a general replacement for clean React state.
 
 ```ts
 const gestureX = useSharedValue(0);
@@ -749,7 +749,7 @@ const pan = Gesture.Pan().onUpdate((event) => {
 <a id="m11"></a>
 ### M11. Why is animation performance not only a JavaScript problem?
 
-- **Answer:** Animations involve React scheduling, native view updates, layout, GPU work, and gesture input. Smooth animation often requires moving updates away from React renders and measuring frame behavior on real devices.
+- **Answer:** Animations involve React scheduling, native view updates, layout, GPU work, and gesture input. Smooth animation often requires moving updates away from React renders and measuring frame behavior on real devices. If each frame depends on React state updates, the JavaScript thread can become a bottleneck. Good animation architecture keeps high-frequency updates close to the UI or animation runtime.
 
 ```tsx
 const opacity = useSharedValue(0);
@@ -761,7 +761,7 @@ opacity.value = withTiming(1, { duration: 180 });
 <a id="m12"></a>
 ### M12. What is the significance of the new animation backend in React Native 0.85?
 
-- **Answer:** The shared animation backend moves more animation update logic into React Native core. It is intended to make Animated and Reanimated more consistent and opens the door to native-driver layout prop animations.
+- **Answer:** The shared animation backend moves more animation update logic into React Native core. It is intended to make Animated and Reanimated more consistent and opens the door to native-driver layout prop animations. The practical takeaway is that animation behavior is becoming more integrated with the New Architecture instead of living only in separate library layers. You should still test animation-heavy screens carefully during RN upgrades.
 
 ```tsx
 Animated.timing(value, {
@@ -776,7 +776,7 @@ Animated.timing(value, {
 <a id="m13"></a>
 ### M13. What should you check when a dependency blocks an upgrade?
 
-- **Answer:** Check whether it supports the current React Native version, New Architecture, Hermes, required platform SDKs, and Expo SDK if relevant. Then decide whether to upgrade, patch, replace, fork, or isolate it behind a native boundary.
+- **Answer:** Check whether it supports the current React Native version, New Architecture, Hermes, required platform SDKs, and Expo SDK if relevant. Then decide whether to upgrade, patch, replace, fork, or isolate it behind a native boundary. A blocked dependency is not only a package problem; it can become a release risk. Strong engineers keep a migration path for critical native libraries before they break upgrades.
 
 ```bash
 npm view react-native-some-library version peerDependencies
@@ -788,7 +788,7 @@ npm ls react-native react
 <a id="m14"></a>
 ### M14. Why do Expo SDK versions matter in interviews?
 
-- **Answer:** Expo SDK versions pin a supported React Native and React version. You should not assume an Expo app can freely jump to any React Native release without waiting for or testing the matching SDK.
+- **Answer:** Expo SDK versions pin a supported React Native and React version. You should not assume an Expo app can freely jump to any React Native release without waiting for or testing the matching SDK. This matters because Expo also coordinates native modules, config plugins, build tooling, and update behavior. In interviews, mentioning SDK alignment shows you understand the full runtime, not only npm versions.
 
 ```json
 {
@@ -804,7 +804,7 @@ npm ls react-native react
 <a id="m15"></a>
 ### M15. What is the difference between OTA updates and app store releases?
 
-- **Answer:** OTA updates can change JavaScript and assets within the same native runtime. Native module changes, permissions, build settings, and incompatible runtime changes require a new app binary.
+- **Answer:** OTA updates can change JavaScript and assets within the same native runtime. Native module changes, permissions, build settings, and incompatible runtime changes require a new app binary. The safe mental model is that OTA updates are for compatible JS and asset changes, not native capability changes. If JS expects a native API that the installed binary does not have, the app can crash even though the update shipped successfully.
 
 ```ts
 // Safe OTA: JS expects native runtime 42.
@@ -816,7 +816,7 @@ export const runtimeVersion = "ios-42.android-42";
 <a id="m16"></a>
 ### M16. How do you make OTA updates safer?
 
-- **Answer:** Use runtime versioning, staged rollout, crash monitoring, rollback, and compatibility checks between JavaScript and native code. Never ship JavaScript that expects native APIs missing from the installed binary.
+- **Answer:** Use runtime versioning, staged rollout, crash monitoring, rollback, and compatibility checks between JavaScript and native code. Never ship JavaScript that expects native APIs missing from the installed binary. A safe OTA process also needs clear release channels and observability by app version. The goal is to make a bad update reversible before it reaches every user.
 
 ```json
 {
@@ -832,7 +832,7 @@ export const runtimeVersion = "ios-42.android-42";
 <a id="m17"></a>
 ### M17. What should a good mobile authentication flow handle?
 
-- **Answer:** It should handle secure token storage, refresh, logout, biometric or passcode policy if needed, deep link callbacks, expired sessions, and device compromise assumptions. Secrets should remain server-side.
+- **Answer:** It should handle secure token storage, refresh, logout, biometric or passcode policy if needed, deep link callbacks, expired sessions, and device compromise assumptions. Secrets should remain server-side. Mobile auth also has lifecycle edge cases like app backgrounding, token expiry during a request, and auth callback links opening a cold app. A solid implementation treats auth as a state machine, not just a login form.
 
 ```ts
 await SecureStore.setItemAsync("refreshToken", token);
@@ -844,7 +844,7 @@ const storedToken = await SecureStore.getItemAsync("refreshToken");
 <a id="m18"></a>
 ### M18. How would you debug a native crash from a React Native app?
 
-- **Answer:** Reproduce with the correct build type, inspect native crash logs, symbolicate the stack trace, map it to the involved native module or platform API, and correlate with JavaScript actions if available.
+- **Answer:** Reproduce with the correct build type, inspect native crash logs, symbolicate the stack trace, map it to the involved native module or platform API, and correlate with JavaScript actions if available. Native crashes often do not show a helpful React stack, so platform logs matter. You should also check whether the crash happens only in release builds, on one OS version, or with one native dependency. That narrows the investigation quickly.
 
 ```bash
 adb logcat AndroidRuntime:E ReactNative:V '*:S'
@@ -856,7 +856,7 @@ xcrun simctl spawn booted log stream --predicate "process == MyApp"
 <a id="m19"></a>
 ### M19. How would you debug a JavaScript freeze?
 
-- **Answer:** Capture a performance profile, inspect long tasks, expensive renders, synchronous loops, JSON parsing, logging, and state updates. If the freeze happens during navigation or gestures, check work being done on focus or mount.
+- **Answer:** Capture a performance profile, inspect long tasks, expensive renders, synchronous loops, JSON parsing, logging, and state updates. If the freeze happens during navigation or gestures, check work being done on focus or mount. A freeze is usually a blocked JavaScript thread or a very expensive native/UI operation. The fix depends on whether the expensive work can be deferred, split, memoized, moved native, or moved off-thread.
 
 ```ts
 performance.mark("parse:start");
@@ -869,7 +869,7 @@ performance.measure("parse", "parse:start");
 <a id="m20"></a>
 ### M20. Why is `InteractionManager` no longer the preferred answer for deferring work?
 
-- **Answer:** Modern docs mark `InteractionManager` as deprecated and recommend avoiding long-running work or using alternatives like `requestIdleCallback`. Interview answers should focus on splitting work, scheduling carefully, and measuring responsiveness.
+- **Answer:** Modern docs mark `InteractionManager` as deprecated and recommend avoiding long-running work or using alternatives like `requestIdleCallback`. Interview answers should focus on splitting work, scheduling carefully, and measuring responsiveness. Deferring work is not the same as making it cheap; it only moves the cost to a less harmful time. If the task is large, chunking or moving it away from the JS thread may still be necessary.
 
 ```ts
 requestIdleCallback(() => {
@@ -882,7 +882,7 @@ requestIdleCallback(() => {
 <a id="m21"></a>
 ### M21. How do you decide between local storage, SQLite, and server cache libraries?
 
-- **Answer:** Use simple key-value storage for small preferences, SQLite for structured local data and queries, and server cache libraries for remote data synchronization. The decision depends on data shape, offline needs, consistency, and migration cost.
+- **Answer:** Use simple key-value storage for small preferences, SQLite for structured local data and queries, and server cache libraries for remote data synchronization. The decision depends on data shape, offline needs, consistency, and migration cost. A theme flag and a searchable offline inbox are not the same storage problem. Pick the smallest storage model that can support the product rules without creating future migration pain.
 
 ```ts
 await storage.set("theme", "dark"); // key-value
@@ -894,7 +894,7 @@ await db.execute("SELECT * FROM notes WHERE archived = 0"); // SQLite
 <a id="m22"></a>
 ### M22. What is a common mistake with app startup performance?
 
-- **Answer:** Doing too much synchronous work before the first useful screen. Defer non-critical initialization, reduce bundle and asset cost, avoid unnecessary providers, and measure cold start separately from warm start.
+- **Answer:** Doing too much synchronous work before the first useful screen. Defer non-critical initialization, reduce bundle and asset cost, avoid unnecessary providers, and measure cold start separately from warm start. Startup work often accumulates through analytics, feature flags, storage reads, font loading, and global providers. A middle-level answer should separate critical path work from nice-to-have initialization.
 
 ```ts
 requestIdleCallback(() => {
@@ -907,7 +907,7 @@ requestIdleCallback(() => {
 <a id="m23"></a>
 ### M23. What is the right way to think about state management libraries?
 
-- **Answer:** A state library should solve a concrete coordination problem, not replace component design. Server state, form state, navigation state, and global client state often need different tools.
+- **Answer:** A state library should solve a concrete coordination problem, not replace component design. Server state, form state, navigation state, and global client state often need different tools. Adding a global store too early can make every screen depend on broad shared state. Good state management starts by deciding ownership, update frequency, persistence, and testing strategy.
 
 ```ts
 const useSessionStore = create<SessionState>((set) => ({
@@ -921,7 +921,7 @@ const useSessionStore = create<SessionState>((set) => ({
 <a id="m24"></a>
 ### M24. How do you prevent unnecessary screen re-renders?
 
-- **Answer:** Keep state close to where it is used, split expensive subtrees, stabilize props only where it matters, and avoid broad context updates. Use profiling before adding memoization everywhere.
+- **Answer:** Keep state close to where it is used, split expensive subtrees, stabilize props only where it matters, and avoid broad context updates. Use profiling before adding memoization everywhere. Context is convenient, but a frequently changing provider can re-render a large part of the tree. Prefer smaller providers, selectors, or local state when only a small part of the UI needs an update.
 
 ```tsx
 const ThemeProvider = ({ children }: PropsWithChildren) => {
@@ -935,7 +935,7 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
 <a id="m25"></a>
 ### M25. What makes image-heavy screens difficult?
 
-- **Answer:** Images affect network, decoding, memory, cache behavior, layout shifts, and scroll performance. A robust solution defines sizes, uses caching, serves correct formats, and avoids decoding too many large images at once.
+- **Answer:** Images affect network, decoding, memory, cache behavior, layout shifts, and scroll performance. A robust solution defines sizes, uses caching, serves correct formats, and avoids decoding too many large images at once. Many image issues show up as list jank or memory pressure rather than obvious image bugs. Always think about dimensions, placeholders, thumbnail strategy, and device memory.
 
 ```tsx
 <Image
@@ -950,7 +950,7 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
 <a id="m26"></a>
 ### M26. What is brownfield React Native?
 
-- **Answer:** Brownfield means embedding React Native inside an existing native app. It requires clear ownership of navigation, native dependencies, build systems, feature boundaries, and rollout strategy.
+- **Answer:** Brownfield means embedding React Native inside an existing native app. It requires clear ownership of navigation, native dependencies, build systems, feature boundaries, and rollout strategy. The hardest part is often not rendering the RN view, but coordinating lifecycle, analytics, dependency versions, and navigation with the host app. Brownfield works best when the RN surface has a clear boundary.
 
 ```swift
 let rootView = RCTRootView(
@@ -965,7 +965,7 @@ let rootView = RCTRootView(
 <a id="m27"></a>
 ### M27. Why are permissions not just a JavaScript concern?
 
-- **Answer:** Permissions are declared and enforced by the native platforms. JavaScript can request and react to them, but app manifests, Info.plist entries, store policies, and platform versions determine what is allowed.
+- **Answer:** Permissions are declared and enforced by the native platforms. JavaScript can request and react to them, but app manifests, Info.plist entries, store policies, and platform versions determine what is allowed. A permission can fail because configuration is missing even if the JS code is correct. You also need user-facing fallback UI for denied, restricted, or permanently denied states.
 
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
@@ -976,7 +976,7 @@ let rootView = RCTRootView(
 <a id="m28"></a>
 ### M28. How do you test a React Native screen properly?
 
-- **Answer:** Use unit tests for logic, component tests for states and interactions, and E2E tests for critical flows on real platform behavior. Also verify accessibility, offline/error states, and release-build behavior for high-risk screens.
+- **Answer:** Use unit tests for logic, component tests for states and interactions, and E2E tests for critical flows on real platform behavior. Also verify accessibility, offline/error states, and release-build behavior for high-risk screens. No single test layer gives full confidence in a React Native app. The right mix depends on risk: business logic should be cheap to test, while navigation, permissions, and native flows need platform coverage.
 
 ```tsx
 render(<ProfileScreen userId="42" />);
@@ -989,7 +989,7 @@ expect(api.refetchProfile).toHaveBeenCalled();
 <a id="m29"></a>
 ### M29. What is the difference between a simulator issue and a device issue?
 
-- **Answer:** Simulators are useful but do not fully represent CPU, memory, GPU, camera, push notifications, biometrics, or vendor-specific Android behavior. Production performance and device APIs must be validated on real hardware.
+- **Answer:** Simulators are useful but do not fully represent CPU, memory, GPU, camera, push notifications, biometrics, or vendor-specific Android behavior. Production performance and device APIs must be validated on real hardware. Some bugs only appear with specific OEM Android builds, low-memory devices, or thermal throttling. Treat simulators as a fast feedback tool, not final proof.
 
 ```bash
 adb shell getprop ro.product.model
@@ -1001,7 +1001,7 @@ adb shell dumpsys meminfo com.example.app
 <a id="m30"></a>
 ### M30. What should you mention when asked about React Native in 2026?
 
-- **Answer:** Mention New Architecture-only releases, Hermes V1 default, stronger DevTools, React 19 support, Expo/RN alignment, performance-focused libraries, and the move toward mature multi-platform support. Avoid presenting the old bridge as the normal runtime.
+- **Answer:** Mention New Architecture-only releases, Hermes V1 default, stronger DevTools, React 19 support, Expo/RN alignment, performance-focused libraries, and the move toward mature multi-platform support. Avoid presenting the old bridge as the normal runtime. This shows that your mental model is current and not stuck in older React Native constraints. You do not need hype; you need to connect current changes to real app decisions.
 
 ```txt
 RN 0.82+: New Architecture only
@@ -1014,7 +1014,7 @@ RN 0.85: new animation backend
 <a id="m31"></a>
 ### M31. How do you choose between `FlatList`, FlashList, and LegendList?
 
-- **Answer:** Start with `FlatList` for simple lists, use FlashList when you need a mature high-performance drop-in list, and consider LegendList for dynamic item sizes or when avoiding native dependencies matters. Check version maturity and measure your real screen instead of deciding from benchmark marketing alone.
+- **Answer:** Start with `FlatList` for simple lists, use FlashList when you need a mature high-performance drop-in list, and consider LegendList for dynamic item sizes or when avoiding native dependencies matters. Check version maturity and measure your real screen instead of deciding from benchmark marketing alone. The row component, image strategy, and data update pattern can matter more than the list library. A good choice balances performance, maintenance, API fit, and team familiarity.
 
 ```tsx
 import { LegendList } from "@legendapp/list/react-native";
@@ -1027,7 +1027,7 @@ return <LegendList data={items} renderItem={renderItem} recycleItems />;
 <a id="m32"></a>
 ### M32. What changed with FlashList v2?
 
-- **Answer:** FlashList v2 targets the New Architecture and removes much of the old estimate-tuning burden. It can be easier to adopt than v1, but you still need stable row components, memoized props, and release-device validation.
+- **Answer:** FlashList v2 targets the New Architecture and removes much of the old estimate-tuning burden. It can be easier to adopt than v1, but you still need stable row components, memoized props, and release-device validation. The library can improve recycling and measurement behavior, but it does not remove the need for good row design. Always compare it against your current list with the same data and devices.
 
 ```tsx
 <FlashList
@@ -1041,7 +1041,7 @@ return <LegendList data={items} renderItem={renderItem} recycleItems />;
 <a id="m33"></a>
 ### M33. What is the practical limitation of React Native for Web?
 
-- **Answer:** Shared components work best when the product behaves similarly across platforms. When web needs SEO, complex desktop layout, browser-first routing, hover-heavy UI, or advanced accessibility semantics, you may need platform-specific files or a dedicated web surface.
+- **Answer:** Shared components work best when the product behaves similarly across platforms. When web needs SEO, complex desktop layout, browser-first routing, hover-heavy UI, or advanced accessibility semantics, you may need platform-specific files or a dedicated web surface. React Native for Web is strongest when you share primitives and logic without pretending the browser is a phone. Middle-level engineers should know when to share and when to branch.
 
 ```tsx
 // SearchInput.web.tsx can use browser-specific behavior.
@@ -1055,7 +1055,7 @@ export function SearchInput() {
 <a id="m34"></a>
 ### M34. What is the native runtime in an Expo app?
 
-- **Answer:** The native runtime is the installed binary's native code, native modules, permissions, and update client. OTA updates can replace JavaScript and assets only when they match that runtime version.
+- **Answer:** The native runtime is the installed binary's native code, native modules, permissions, and update client. OTA updates can replace JavaScript and assets only when they match that runtime version. This is why runtime versioning is central to Expo updates: it prevents JS from targeting the wrong binary. If the native runtime changes, you need a new app store build or a separate compatible update track.
 
 ```json
 {
@@ -1070,7 +1070,7 @@ export function SearchInput() {
 <a id="m35"></a>
 ### M35. How should a React Native app consume an AI streaming response?
 
-- **Answer:** Prefer a backend endpoint that normalizes provider-specific streaming into one simple protocol for the app. The client should read chunks, update state incrementally, and support aborting when the user navigates away.
+- **Answer:** Prefer a backend endpoint that normalizes provider-specific streaming into one simple protocol for the app. The client should read chunks, update state incrementally, and support aborting when the user navigates away. Streaming UI also needs clear states for connecting, receiving, complete, cancelled, and failed. Without that, partial responses can create duplicate messages or confusing retries.
 
 ```ts
 const controller = new AbortController();
@@ -1083,7 +1083,7 @@ const reader = response.body?.getReader();
 <a id="m36"></a>
 ### M36. Why should cloud AI calls usually go through your backend?
 
-- **Answer:** The mobile app cannot safely hold provider secrets, policy logic, rate limits, or audit rules. A backend lets you hide keys, normalize providers, enforce user quotas, and log AI failures consistently.
+- **Answer:** The mobile app cannot safely hold provider secrets, policy logic, rate limits, or audit rules. A backend lets you hide keys, normalize providers, enforce user quotas, and log AI failures consistently. It also gives you a place to apply moderation, caching, prompt templates, and model routing. The app should send user intent and receive a controlled response stream, not own provider credentials.
 
 ```ts
 await fetch("https://api.example.com/ai/chat", {
@@ -1097,7 +1097,7 @@ await fetch("https://api.example.com/ai/chat", {
 <a id="m37"></a>
 ### M37. What must you manage when shipping a local model?
 
-- **Answer:** You need a model download or bundling strategy, versioning, disk limits, warmup, cancellation, memory pressure handling, and fallback to cloud or disabled UI. Local inference is a product lifecycle, not just one native call.
+- **Answer:** You need a model download or bundling strategy, versioning, disk limits, warmup, cancellation, memory pressure handling, and fallback to cloud or disabled UI. Local inference is a product lifecycle, not just one native call. Devices differ heavily in RAM, acceleration, storage, and thermal behavior, so capability checks are required. A middle-level implementation should make local AI observable and safely optional.
 
 ```ts
 await LocalModel.ensureDownloaded("gemma-4-e2b-q4");
