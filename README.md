@@ -341,11 +341,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 <a id="j19"></a>
 ### J19. Where should API secrets be stored?
 
-- **Answer:** Do not ship secrets in the mobile app bundle. Public config can live in app config, but real secrets belong on a server because users can inspect app binaries and JavaScript bundles. Anything in the client should be treated as public, including values hidden in environment files at build time. The app should call your backend, and the backend should call secret-protected services.
+- **Answer:** Do not ship API provider secrets in the mobile app bundle, including AI provider keys baked through build-time environment files. Public config can live in app config, but secrets belong on a server because users can inspect app binaries, JavaScript bundles, and network calls. For AI features, the app should call your backend or request a short-lived, scoped session token only when the provider supports that pattern.
 
 ```ts
-// Client calls your backend, not a private provider secret directly.
-await fetch("https://api.example.com/payments/session", { method: "POST" });
+// Client asks your backend for an app-scoped AI session, not a provider API key.
+await fetch("https://api.example.com/ai/session", { method: "POST" });
 ```
 
 [⬆️ Jump back](#junior-questions)
@@ -544,11 +544,14 @@ npx expo run:ios
 <a id="j34"></a>
 ### J34. What is streaming in an AI chat UI?
 
-- **Answer:** Streaming means the app renders tokens or chunks as they arrive instead of waiting for the full answer. It improves perceived latency, but the UI must handle cancellation, partial text, errors, and retry. From a user perspective, streaming makes an AI feature feel responsive even when the full answer takes time. From an engineering perspective, partial data is still real state and needs careful handling.
+- **Answer:** Streaming means the app receives structured deltas from your backend or AI provider and renders a draft answer before the final message is complete. Do not treat raw network chunks as complete JSON or complete tokens; SSE frames can be split, buffered, retried, or cancelled. Even at junior level, the UI should track a draft assistant message, cancellation, error, and final commit separately.
 
 ```ts
-for await (const chunk of chatStream) {
-  setMessage((value) => value + chunk);
+const controller = new AbortController();
+
+for await (const event of readAIStream("/ai/stream", { signal: controller.signal })) {
+  if (event.type === "delta") appendDraft(event.text);
+  if (event.type === "done") commitDraft(event.usage);
 }
 ```
 
@@ -557,12 +560,13 @@ for await (const chunk of chatStream) {
 <a id="j35"></a>
 ### J35. What is a local LLM in a mobile app?
 
-- **Answer:** A local LLM runs inference on the user's device instead of calling a cloud API. It can improve privacy and offline behavior, but it costs storage, memory, battery, startup time, and native integration effort. Small local models are useful for constrained tasks, not as a magic replacement for every cloud model. The app should check device capability and provide a fallback when local inference is not realistic.
+- **Answer:** A local LLM runs a quantized small model inside a native runtime instead of sending the prompt to a cloud API. In 2026-style React Native, that might mean Gemma 4 E2B/E4B through LiteRT-LM on Android/C++ paths, or Qwen3-style small models through an Apple-side runtime such as MLX/MLX Swift after conversion. The JavaScript layer should not load raw weights directly; it should call a typed native boundary that checks RAM, disk, accelerator support, context size, and fallback mode.
 
 ```ts
-const reply = await NativeModules.LocalLLM.generate({
-  prompt: "Summarize these notes",
-  maxTokens: 80,
+await LocalLLM.prepare({
+  modelId: "gemma-4-e2b-it-q4",
+  runtime: Platform.OS === "ios" ? "mlx" : "litert-lm",
+  contextTokens: 2048,
 });
 ```
 
@@ -1070,12 +1074,15 @@ export function SearchInput() {
 <a id="m35"></a>
 ### M35. How should a React Native app consume an AI streaming response?
 
-- **Answer:** Prefer a backend endpoint that normalizes provider-specific streaming into one simple protocol for the app. The client should read chunks, update state incrementally, and support aborting when the user navigates away. Streaming UI also needs clear states for connecting, receiving, complete, cancelled, and failed. Without that, partial responses can create duplicate messages or confusing retries.
+- **Answer:** Prefer a backend endpoint that converts provider-specific SSE, JSONL, or realtime events into one app-owned stream schema. React Native should parse complete events, not raw byte chunks, and it should batch UI updates so one token does not mean one expensive render. Include `messageId`, monotonic `seq`, `done`, `usage`, and `error` events so retries and duplicate chunks do not corrupt the visible answer.
 
 ```ts
 const controller = new AbortController();
 const response = await fetch("https://api.example.com/ai/stream", { signal: controller.signal });
-const reader = response.body?.getReader();
+
+for await (const event of parseAppAIStream(response.body)) {
+  if (event.seq > lastSeq) applyChatEvent(event);
+}
 ```
 
 [⬆️ Jump back](#middle-questions)
@@ -1083,11 +1090,12 @@ const reader = response.body?.getReader();
 <a id="m36"></a>
 ### M36. Why should cloud AI calls usually go through your backend?
 
-- **Answer:** The mobile app cannot safely hold provider secrets, policy logic, rate limits, or audit rules. A backend lets you hide keys, normalize providers, enforce user quotas, and log AI failures consistently. It also gives you a place to apply moderation, caching, prompt templates, and model routing. The app should send user intent and receive a controlled response stream, not own provider credentials.
+- **Answer:** The mobile app cannot safely hold provider secrets, model-routing policy, moderation rules, or rate-limit logic. A backend lets you normalize OpenAI/Gemini/Anthropic-style APIs, attach request IDs, enforce quotas, run retrieval/tool calls, cache safe responses, and log provider failures without exposing credentials. The app should send user intent plus conversation state and receive your controlled event schema, not provider-native payloads.
 
 ```ts
 await fetch("https://api.example.com/ai/chat", {
   method: "POST",
+  headers: { "Idempotency-Key": requestId },
   body: JSON.stringify({ conversationId, message }),
 });
 ```
@@ -1097,11 +1105,15 @@ await fetch("https://api.example.com/ai/chat", {
 <a id="m37"></a>
 ### M37. What must you manage when shipping a local model?
 
-- **Answer:** You need a model download or bundling strategy, versioning, disk limits, warmup, cancellation, memory pressure handling, and fallback to cloud or disabled UI. Local inference is a product lifecycle, not just one native call. Devices differ heavily in RAM, acceleration, storage, and thermal behavior, so capability checks are required. A middle-level implementation should make local AI observable and safely optional.
+- **Answer:** You need a model manifest, download or bundle strategy, checksum, license, quantization level, runtime compatibility, disk budget, warmup, cancellation, and cloud fallback. Model formats are runtime-specific: `.litertlm` for LiteRT-LM paths, MLX-converted weights for Apple MLX paths, or another native format chosen by the team. Treat model updates like native capability updates because a JS bundle that expects a missing model/runtime can fail just like a missing native module.
 
 ```ts
-await LocalModel.ensureDownloaded("gemma-4-e2b-q4");
-const status = await LocalModel.getStatus();
+await LocalModel.install({
+  id: "qwen3-1.7b-q4",
+  runtime: "mlx",
+  sha256: modelSha,
+  minRamGb: 6,
+});
 ```
 
 [⬆️ Jump back](#middle-questions)
@@ -1463,13 +1475,16 @@ const columns = width >= 768 ? 2 : 1;
 <a id="s25"></a>
 ### S25. How would you introduce on-device AI into a React Native app?
 
-- **Answer:** Start with product value, privacy, model size, latency, battery, fallback, and observability. On-device AI may need native acceleration and careful memory management, so do not treat it as a normal API call. You also need to decide how models are downloaded, updated, disabled, or replaced. The feature should degrade gracefully because not every supported device can run the same model well.
+- **Answer:** Start with a task matrix: which tasks must be local, which can be cloud, and which need hybrid fallback. Then benchmark candidate models such as Gemma 4 E2B/E4B or Qwen3-0.6B/1.7B/4B on real devices for TTFT, tokens/sec, peak RSS, disk size, battery, thermal behavior, and answer quality. The architecture should hide LiteRT-LM, MLX, Core ML, or C++ details behind one typed JS API while still reporting enough telemetry to disable bad model/device combinations remotely.
 
 ```ts
-const result = await NativeModules.OnDeviceModel.generate({
-  prompt,
-  maxTokens: 64,
+const engine = await AIRuntime.pick({
+  task: "private-summary",
+  maxMemoryMb: 2500,
+  allowCloudFallback: true,
 });
+
+const stream = engine.generate({ prompt, maxTokens: 128 });
 ```
 
 [⬆️ Jump back](#senior-questions)
@@ -1477,11 +1492,14 @@ const result = await NativeModules.OnDeviceModel.generate({
 <a id="s26"></a>
 ### S26. What is the risk of blindly adopting AI-generated React Native code?
 
-- **Answer:** It often ignores platform constraints, native configuration, accessibility, performance, security, and upgrade compatibility. Senior review should force code into established project patterns and verify behavior on real devices. Generated code can be useful for drafts, but it must still pass the same engineering bar as human code. The risk is especially high around permissions, native modules, background behavior, and list performance.
+- **Answer:** Generated code often ignores native configuration, New Architecture compatibility, runtime-version safety, accessibility, cancellation, streaming protocol parsing, and provider-key security. Senior review should check native diffs, config plugins, permissions, release compatibility, device behavior, and whether the code follows the app's established data and error-state patterns. AI output is useful as a draft, but it is especially risky around native modules, background work, list performance, and direct AI API calls from the client.
 
 ```tsx
-// Review AI output for platform behavior, not only TypeScript.
-<Pressable accessibilityRole="button" hitSlop={12} onPress={onPress} />
+// Review generated code for native/runtime behavior, not only TypeScript.
+const abortController = new AbortController();
+await fetch("/ai/stream", { signal: abortController.signal });
+
+return <Pressable accessibilityRole="button" hitSlop={12} onPress={onPress} />;
 ```
 
 [⬆️ Jump back](#senior-questions)
@@ -1580,11 +1598,12 @@ eas update --channel production --message "JS-only fix"
 <a id="s34"></a>
 ### S34. What is a good AI streaming architecture for mobile?
 
-- **Answer:** Put provider adapters on the backend, stream normalized chunks to the app, and persist enough state to resume or retry safely. The mobile client should focus on rendering, cancellation, offline state, and error recovery. This keeps provider keys, model routing, moderation, and rate limiting out of the app. It also lets you change AI vendors without shipping a new binary for every provider detail.
+- **Answer:** Put provider adapters on the backend, expose one app-owned SSE/WebSocket protocol, and persist request state by `conversationId`, `messageId`, and `seq`. The protocol should support text deltas, tool-call argument deltas, citations, moderation blocks, usage, retry cursors, and terminal errors. The mobile client focuses on rendering, cancellation, lifecycle recovery, and backpressure, while the backend owns provider keys, model routing, prompt templates, RAG, moderation, and rate limits.
 
 ```ts
 type ChatChunk =
-  | { type: "delta"; text: string }
+  | { type: "delta"; messageId: string; seq: number; text: string }
+  | { type: "tool_delta"; callId: string; argsJsonDelta: string }
   | { type: "done"; usage: TokenUsage }
   | { type: "error"; message: string };
 ```
@@ -1594,11 +1613,12 @@ type ChatChunk =
 <a id="s35"></a>
 ### S35. When does local LLM inference make product sense?
 
-- **Answer:** Local inference makes sense for privacy-sensitive, offline, low-latency, or cost-sensitive features where small models are good enough. It is a poor fit when quality, long context, tool use, or battery limits require cloud models. The product should define whether "good enough locally" is actually useful to users. Hybrid designs often work best: local for quick/private tasks and cloud for heavier reasoning.
+- **Answer:** Local inference makes sense for bounded tasks where small quantized models are enough: intent classification, PII redaction, short private summaries, offline commands, lightweight RAG, or draft rewrites. It is weak for long-context reasoning, complex tool use, high factuality requirements, or tasks where battery and thermal cost exceed the value. A strong design uses a cascade: try local Gemma/Qwen-class models when capability and confidence are high, then escalate to cloud when the task exceeds the device budget.
 
-```txt
-local: private summaries, quick classification, offline assist
-cloud: deep reasoning, long context, heavy tool use
+```ts
+if (task === "classify" && device.ramGb >= 4) return "qwen3-0.6b-q4";
+if (task === "summarize" && device.ramGb >= 6) return "gemma-4-e2b-q4";
+return "cloud-frontier-model";
 ```
 
 [⬆️ Jump back](#senior-questions)
@@ -1618,10 +1638,15 @@ const answer = await llm.generate({ prompt, context: hits });
 <a id="s37"></a>
 ### S37. How should AI features degrade across devices?
 
-- **Answer:** Use capability checks and remote config to choose local, cloud, hybrid, or disabled modes. Good AI UX explains unavailable states and avoids crashing low-memory devices with a model they cannot run. Degradation should be designed as part of the feature, not added after crashes appear. A senior implementation treats model availability, network, battery, thermal state, and account permissions as runtime inputs.
+- **Answer:** Use a capability matrix that includes runtime availability, RAM, free disk, accelerator support, battery/low-power mode, thermal state, network, privacy setting, and account entitlements. Degradation can reduce context length, switch model size, disable multimodal input, use cloud fallback, or hide the feature entirely. The UI contract should stay stable while the execution mode changes, and remote config should be able to quarantine a bad model/runtime combination without a binary release.
 
 ```ts
-const mode = supportsLocalLLM ? "local" : flags.cloudAI ? "cloud" : "disabled";
+const mode = chooseAIMode({
+  localRuntime: caps.mlx || caps.litertLm,
+  ramGb: caps.ramGb,
+  thermal: caps.thermalState,
+  cloudAllowed: flags.cloudAI && user.aiCloudConsent,
+});
 return <Assistant mode={mode} />;
 ```
 
@@ -2102,10 +2127,13 @@ native runtime version Y
 <a id="g35"></a>
 ### G35. What can go wrong with AI streaming on mobile?
 
-- **Answer:** Streams can fail through flaky networks, backgrounding, proxy buffering, malformed provider chunks, backpressure, duplicate retries, and partial moderation failures. Robust clients model stream state explicitly instead of treating streaming as a fancy string append. Mobile adds lifecycle problems like app suspension, navigation away, and changing connectivity mid-generation. The server and client both need idempotency and cancellation semantics.
+- **Answer:** Streams fail when byte chunks are mistaken for semantic events, SSE frames split JSON, proxies buffer data, radio changes reset connections, or app backgrounding pauses the JS runtime mid-response. Tool-call streaming adds another failure mode because argument JSON may arrive in fragments and must be assembled before execution. A serious architecture uses idempotent request IDs, ordered sequence numbers, resumable cursors, explicit abort propagation, and throttled UI commits so token flow does not overload React rendering.
 
 ```ts
-type StreamState = "idle" | "connecting" | "streaming" | "aborted" | "failed" | "done";
+type AIStreamEvent =
+  | { type: "delta"; requestId: string; seq: number; text: string }
+  | { type: "tool_delta"; callId: string; argsJsonDelta: string }
+  | { type: "done"; requestId: string; usage: TokenUsage };
 ```
 
 [⬆️ Jump back](#god-mode-questions)
@@ -2113,13 +2141,13 @@ type StreamState = "idle" | "connecting" | "streaming" | "aborted" | "failed" | 
 <a id="g36"></a>
 ### G36. What is the native boundary for local LLM inference?
 
-- **Answer:** The native side should own model loading, memory mapping, accelerator selection, token generation, cancellation, and thermal/memory handling. JavaScript should get a small typed API, progress events, and safe errors, not raw model internals. Local inference is closer to media or database infrastructure than to a normal fetch call. A good boundary protects the React app from model lifecycle complexity while still exposing observability.
+- **Answer:** The native side should own model files, tokenizer loading, memory mapping, quantization/runtime selection, KV-cache allocation, GPU/NPU/Metal backend choice, token generation, cancellation, and thermal/memory handling. JavaScript should control task-level options and receive typed token/progress/error events, not raw tensors, logits, allocator handles, or runtime-owned objects. For React Native, this usually means a narrow TurboModule/JSI boundary around LiteRT-LM, MLX/MLX Swift, Core ML, or C++ runtime code, with observability surfaced back to JS.
 
 ```ts
-type LocalLLM = {
-  load(modelId: string): Promise<void>;
-  generate(prompt: string, options: GenerateOptions): AsyncIterable<string>;
-  cancel(requestId: string): Promise<void>;
+type LocalLLMSession = {
+  prepare(manifest: ModelManifest): Promise<{ sessionId: string; runtime: "mlx" | "litert-lm" }>;
+  generate(sessionId: string, input: PromptInput, options: GenerateOptions): NativeTokenStream;
+  release(sessionId: string): Promise<void>;
 };
 ```
 
@@ -2128,12 +2156,12 @@ type LocalLLM = {
 <a id="g37"></a>
 ### G37. How does Gemma 4 change the local AI conversation for React Native?
 
-- **Answer:** Gemma 4's edge-focused E2B and E4B models make serious on-device AI more realistic, especially through Google AI Edge and LiteRT-style runtimes. The React Native challenge is still packaging, native bindings, device capability checks, and designing features that do useful work with small local models. The model announcement does not remove mobile constraints like memory, battery, thermal throttling, and app size. The winning product design uses local models where their constraints are a feature, not a liability.
+- **Answer:** Gemma 4 E2B/E4B and small Qwen-class models move the question from "can a phone run an LLM?" to "which task, quantization, runtime, and device budget make this useful?" LiteRT-LM brings LLM-specific runtime concerns such as session state, KV-cache management, prompt caching, hardware acceleration, and MTP/speculative decoding support where available into the Android/C++ side of the conversation. On Apple platforms, MLX/MLX Swift is the important native path to understand, but React Native still needs packaging, memory limits, typed bindings, telemetry, and cloud fallback. The best answer compares runtime capabilities instead of name-dropping models.
 
 ```txt
-Gemma 4 E2B/E4B -> local capability
-React Native app -> native runtime wrapper + safe JS API
-Product -> fallback when device cannot run it
+Android/C++: LiteRT-LM + Gemma 4 E2B/E4B .litertlm
+iOS/macOS: MLX/MLX Swift + small Gemma/Qwen quantized model
+React Native: typed stream API + telemetry + cloud fallback
 ```
 
 [⬆️ Jump back](#god-mode-questions)
@@ -2164,9 +2192,16 @@ Primary sources used for the current baseline:
 - [Shopify Engineering: FlashList v2](https://shopify.engineering/flashlist-v2)
 - [Legend List overview](https://legendapp.com/open-source/list/v3/overview/)
 - [Legend List React Native getting started](https://legendapp.com/open-source/list/v3/react-native/getting-started/)
+- [Google AI Edge: Deploy GenAI Models with LiteRT](https://ai.google.dev/edge/litert/genai/overview)
+- [Google AI Edge: LiteRT-LM GitHub](https://github.com/google-ai-edge/LiteRT-LM)
 - [Google: Gemma 4](https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/)
 - [Google Developers: Gemma 4 on the edge](https://developers.googleblog.com/bring-state-of-the-art-agentic-skills-to-the-edge-with-gemma-4/)
 - [Google AI Edge: LLM Inference guide](https://ai.google.dev/edge/mediapipe/solutions/genai/llm_inference)
+- [Apple Open Source: MLX](https://opensource.apple.com/projects/mlx/)
+- [MLX Swift](https://github.com/ml-explore/mlx-swift)
+- [Qwen3-0.6B on Hugging Face](https://huggingface.co/Qwen/Qwen3-0.6B)
+- [OpenAI API docs: Streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses)
+- [OpenAI API reference: authentication](https://developers.openai.com/api/reference/overview)
 - [Software Mansion: React Native in 2026 Trends and Predictions](https://swmansion.com/blog/react-native-in-2026-trends-our-predictions-463a837420c7/)
 - [Callstack: React Native Wrapped 2025](https://www.callstack.com/blog/react-native-wrapped-2025-a-month-by-month-recap-of-the-year)
 - [Infinite Red: React Native Wrapped 2025](https://shift.infinite.red/react-native-wrapped-2025-the-year-we-entered-our-polishing-era-79c6a3e5b4b7)
