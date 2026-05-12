@@ -44,6 +44,9 @@ The levels are not about job titles only:
 - The modern architecture includes Fabric, TurboModules, Codegen, JSI, Hermes, modern DevTools, and React 19 features.
 - Expo SDK releases intentionally track specific React Native versions, so interview answers should mention version alignment instead of assuming every Expo project is on latest React Native.
 - Performance answers should start with measurement: React Native DevTools, performance marks, release builds, device profiling, and production telemetry.
+- List answers should know the tradeoffs between `FlatList`, FlashList v2, and LegendList instead of blindly replacing every list.
+- Web answers should treat React Native for Web as a shared platform target with real browser constraints, not as "mobile UI in a tab."
+- AI answers should distinguish cloud APIs, streaming transport, and local on-device inference with small models such as Gemma 4 E2B/E4B.
 
 ---
 
@@ -81,6 +84,11 @@ The levels are not about job titles only:
 | J28 | [Why should you avoid heavy console logging in mobile apps?](#j28) |
 | J29 | [What is an error boundary?](#j29) |
 | J30 | [What makes a pull request in React Native safer to review?](#j30) |
+| J31 | [When is `FlatList` still the right choice?](#j31) |
+| J32 | [What is React Native for Web?](#j32) |
+| J33 | [Why do Expo development builds matter?](#j33) |
+| J34 | [What is streaming in an AI chat UI?](#j34) |
+| J35 | [What is a local LLM in a mobile app?](#j35) |
 
 <a id="j01"></a>
 ### J01. What is React Native actually rendering?
@@ -492,6 +500,74 @@ class Boundary extends React.Component<Props, { failed: boolean }> {
 
 [⬆️ Jump back](#junior-questions)
 
+<a id="j31"></a>
+### J31. When is `FlatList` still the right choice?
+
+- **Answer:** Use `FlatList` when the list is simple, medium-sized, and already performs well in release builds. Reaching for FlashList or LegendList only makes sense after you can point to measured list problems.
+
+```tsx
+<FlatList
+  data={notifications}
+  keyExtractor={(item) => item.id}
+  renderItem={({ item }) => <NotificationRow item={item} />}
+/>
+```
+
+[⬆️ Jump back](#junior-questions)
+
+<a id="j32"></a>
+### J32. What is React Native for Web?
+
+- **Answer:** React Native for Web maps React Native primitives like `View`, `Text`, and `Pressable` to web elements. It is useful for shared UI and product logic, but browser layout, accessibility, SEO, and routing still need web-specific judgment.
+
+```tsx
+import { Platform, Text } from "react-native";
+
+const label = Platform.OS === "web" ? "Open in browser" : "Open in app";
+return <Text>{label}</Text>;
+```
+
+[⬆️ Jump back](#junior-questions)
+
+<a id="j33"></a>
+### J33. Why do Expo development builds matter?
+
+- **Answer:** Development builds are custom app binaries with your native modules and config included. They keep Expo's workflow while letting you test native behavior that Expo Go cannot contain.
+
+```bash
+npx expo install expo-dev-client
+npx expo run:ios
+```
+
+[⬆️ Jump back](#junior-questions)
+
+<a id="j34"></a>
+### J34. What is streaming in an AI chat UI?
+
+- **Answer:** Streaming means the app renders tokens or chunks as they arrive instead of waiting for the full answer. It improves perceived latency, but the UI must handle cancellation, partial text, errors, and retry.
+
+```ts
+for await (const chunk of chatStream) {
+  setMessage((value) => value + chunk);
+}
+```
+
+[⬆️ Jump back](#junior-questions)
+
+<a id="j35"></a>
+### J35. What is a local LLM in a mobile app?
+
+- **Answer:** A local LLM runs inference on the user's device instead of calling a cloud API. It can improve privacy and offline behavior, but it costs storage, memory, battery, startup time, and native integration effort.
+
+```ts
+const reply = await NativeModules.LocalLLM.generate({
+  prompt: "Summarize these notes",
+  maxTokens: 80,
+});
+```
+
+[⬆️ Jump back](#junior-questions)
+
 ---
 
 ## Middle Questions
@@ -528,6 +604,13 @@ class Boundary extends React.Component<Props, { failed: boolean }> {
 | M28 | [How do you test a React Native screen properly?](#m28) |
 | M29 | [What is the difference between a simulator issue and a device issue?](#m29) |
 | M30 | [What should you mention when asked about React Native in 2026?](#m30) |
+| M31 | [How do you choose between `FlatList`, FlashList, and LegendList?](#m31) |
+| M32 | [What changed with FlashList v2?](#m32) |
+| M33 | [What is the practical limitation of React Native for Web?](#m33) |
+| M34 | [What is the native runtime in an Expo app?](#m34) |
+| M35 | [How should a React Native app consume an AI streaming response?](#m35) |
+| M36 | [Why should cloud AI calls usually go through your backend?](#m36) |
+| M37 | [What must you manage when shipping a local model?](#m37) |
 
 <a id="m01"></a>
 ### M01. What changed when React Native became New Architecture-only?
@@ -928,6 +1011,101 @@ RN 0.85: new animation backend
 
 [⬆️ Jump back](#middle-questions)
 
+<a id="m31"></a>
+### M31. How do you choose between `FlatList`, FlashList, and LegendList?
+
+- **Answer:** Start with `FlatList` for simple lists, use FlashList when you need a mature high-performance drop-in list, and consider LegendList for dynamic item sizes or when avoiding native dependencies matters. Check version maturity and measure your real screen instead of deciding from benchmark marketing alone.
+
+```tsx
+import { LegendList } from "@legendapp/list/react-native";
+
+return <LegendList data={items} renderItem={renderItem} recycleItems />;
+```
+
+[⬆️ Jump back](#middle-questions)
+
+<a id="m32"></a>
+### M32. What changed with FlashList v2?
+
+- **Answer:** FlashList v2 targets the New Architecture and removes much of the old estimate-tuning burden. It can be easier to adopt than v1, but you still need stable row components, memoized props, and release-device validation.
+
+```tsx
+<FlashList
+  data={messages}
+  renderItem={({ item }) => <MessageBubble message={item} />}
+/>
+```
+
+[⬆️ Jump back](#middle-questions)
+
+<a id="m33"></a>
+### M33. What is the practical limitation of React Native for Web?
+
+- **Answer:** Shared components work best when the product behaves similarly across platforms. When web needs SEO, complex desktop layout, browser-first routing, hover-heavy UI, or advanced accessibility semantics, you may need platform-specific files or a dedicated web surface.
+
+```tsx
+// SearchInput.web.tsx can use browser-specific behavior.
+export function SearchInput() {
+  return <TextInput inputMode="search" accessibilityRole="searchbox" />;
+}
+```
+
+[⬆️ Jump back](#middle-questions)
+
+<a id="m34"></a>
+### M34. What is the native runtime in an Expo app?
+
+- **Answer:** The native runtime is the installed binary's native code, native modules, permissions, and update client. OTA updates can replace JavaScript and assets only when they match that runtime version.
+
+```json
+{
+  "expo": {
+    "runtimeVersion": { "policy": "fingerprint" }
+  }
+}
+```
+
+[⬆️ Jump back](#middle-questions)
+
+<a id="m35"></a>
+### M35. How should a React Native app consume an AI streaming response?
+
+- **Answer:** Prefer a backend endpoint that normalizes provider-specific streaming into one simple protocol for the app. The client should read chunks, update state incrementally, and support aborting when the user navigates away.
+
+```ts
+const controller = new AbortController();
+const response = await fetch("https://api.example.com/ai/stream", { signal: controller.signal });
+const reader = response.body?.getReader();
+```
+
+[⬆️ Jump back](#middle-questions)
+
+<a id="m36"></a>
+### M36. Why should cloud AI calls usually go through your backend?
+
+- **Answer:** The mobile app cannot safely hold provider secrets, policy logic, rate limits, or audit rules. A backend lets you hide keys, normalize providers, enforce user quotas, and log AI failures consistently.
+
+```ts
+await fetch("https://api.example.com/ai/chat", {
+  method: "POST",
+  body: JSON.stringify({ conversationId, message }),
+});
+```
+
+[⬆️ Jump back](#middle-questions)
+
+<a id="m37"></a>
+### M37. What must you manage when shipping a local model?
+
+- **Answer:** You need a model download or bundling strategy, versioning, disk limits, warmup, cancellation, memory pressure handling, and fallback to cloud or disabled UI. Local inference is a product lifecycle, not just one native call.
+
+```ts
+await LocalModel.ensureDownloaded("gemma-4-e2b-q4");
+const status = await LocalModel.getStatus();
+```
+
+[⬆️ Jump back](#middle-questions)
+
 ---
 
 ## Senior Questions
@@ -964,6 +1142,13 @@ RN 0.85: new animation backend
 | S28 | [How do you handle a critical dependency that is unmaintained?](#s28) |
 | S29 | [What is the senior answer to "React Native vs native"?](#s29) |
 | S30 | [What makes someone senior in React Native?](#s30) |
+| S31 | [How would you evaluate list libraries for a production feed?](#s31) |
+| S32 | [How would you architect a React Native plus web codebase?](#s32) |
+| S33 | [How do Expo updates relate to native bundles?](#s33) |
+| S34 | [What is a good AI streaming architecture for mobile?](#s34) |
+| S35 | [When does local LLM inference make product sense?](#s35) |
+| S36 | [How would you design mobile RAG with local documents?](#s36) |
+| S37 | [How should AI features degrade across devices?](#s37) |
 
 <a id="s01"></a>
 ### S01. How would you plan an upgrade from an old React Native app to current RN?
@@ -1353,6 +1538,95 @@ Rendering + native + builds + releases + telemetry
 
 [⬆️ Jump back](#senior-questions)
 
+<a id="s31"></a>
+### S31. How would you evaluate list libraries for a production feed?
+
+- **Answer:** Compare `FlatList`, FlashList, and LegendList with your real row components, images, pagination, inserts, and device mix. Look at frame drops, blank areas, memory, scroll position correctness, bundle/native risk, and maintenance.
+
+```ts
+performance.mark("feed-scroll:start");
+// profile scroll on a release build, then compare list implementations
+performance.mark("feed-scroll:end");
+performance.measure("feed-scroll", "feed-scroll:start", "feed-scroll:end");
+```
+
+[⬆️ Jump back](#senior-questions)
+
+<a id="s32"></a>
+### S32. How would you architect a React Native plus web codebase?
+
+- **Answer:** Share domain logic, data fetching, design tokens, and simple primitives, but allow platform-specific routing, navigation, SEO, and layout where the platforms diverge. A universal app fails when it forces mobile assumptions onto desktop web.
+
+```txt
+shared: hooks, API clients, tokens, simple UI
+native: navigation, permissions, gestures
+web: routing, SEO, responsive layout
+```
+
+[⬆️ Jump back](#senior-questions)
+
+<a id="s33"></a>
+### S33. How do Expo updates relate to native bundles?
+
+- **Answer:** An EAS Update ships a JavaScript bundle and assets to compatible native builds; it does not change native code already installed on the device. Any native module, permission, config plugin, SDK, or runtime change needs a new binary and runtime targeting.
+
+```bash
+eas build --profile production --platform ios
+eas update --channel production --message "JS-only fix"
+```
+
+[⬆️ Jump back](#senior-questions)
+
+<a id="s34"></a>
+### S34. What is a good AI streaming architecture for mobile?
+
+- **Answer:** Put provider adapters on the backend, stream normalized chunks to the app, and persist enough state to resume or retry safely. The mobile client should focus on rendering, cancellation, offline state, and error recovery.
+
+```ts
+type ChatChunk =
+  | { type: "delta"; text: string }
+  | { type: "done"; usage: TokenUsage }
+  | { type: "error"; message: string };
+```
+
+[⬆️ Jump back](#senior-questions)
+
+<a id="s35"></a>
+### S35. When does local LLM inference make product sense?
+
+- **Answer:** Local inference makes sense for privacy-sensitive, offline, low-latency, or cost-sensitive features where small models are good enough. It is a poor fit when quality, long context, tool use, or battery limits require cloud models.
+
+```txt
+local: private summaries, quick classification, offline assist
+cloud: deep reasoning, long context, heavy tool use
+```
+
+[⬆️ Jump back](#senior-questions)
+
+<a id="s36"></a>
+### S36. How would you design mobile RAG with local documents?
+
+- **Answer:** Keep embeddings, indexing, permissions, and storage limits explicit. For mobile, the hardest parts are incremental indexing, privacy boundaries, memory, and making retrieval fast enough before generation starts.
+
+```ts
+const hits = await vectorStore.search(embedding, { topK: 5 });
+const answer = await llm.generate({ prompt, context: hits });
+```
+
+[⬆️ Jump back](#senior-questions)
+
+<a id="s37"></a>
+### S37. How should AI features degrade across devices?
+
+- **Answer:** Use capability checks and remote config to choose local, cloud, hybrid, or disabled modes. Good AI UX explains unavailable states and avoids crashing low-memory devices with a model they cannot run.
+
+```ts
+const mode = supportsLocalLLM ? "local" : flags.cloudAI ? "cloud" : "disabled";
+return <Assistant mode={mode} />;
+```
+
+[⬆️ Jump back](#senior-questions)
+
 ---
 
 ## God Mode Questions
@@ -1389,6 +1663,13 @@ Rendering + native + builds + releases + telemetry
 | G28 | [How would you evaluate a custom renderer or non-mobile target?](#g28) |
 | G29 | [What is the deepest reason old bridge-era answers are now weak?](#g29) |
 | G30 | [What is the God Mode answer to "How do you make React Native apps fast?"](#g30) |
+| G31 | [What actually makes virtualized lists hard?](#g31) |
+| G32 | [Why does FlashList v2 benefit from the New Architecture?](#g32) |
+| G33 | [What is the deep tradeoff of React Native for Web?](#g33) |
+| G34 | [What is the exact contract between an OTA bundle and native runtime?](#g34) |
+| G35 | [What can go wrong with AI streaming on mobile?](#g35) |
+| G36 | [What is the native boundary for local LLM inference?](#g36) |
+| G37 | [How does Gemma 4 change the local AI conversation for React Native?](#g37) |
 
 <a id="g01"></a>
 ### G01. What are the major phases of the Fabric rendering pipeline?
@@ -1766,6 +2047,97 @@ performance.measure("checkout", "checkout:start");
 
 [⬆️ Jump back](#god-mode-questions)
 
+<a id="g31"></a>
+### G31. What actually makes virtualized lists hard?
+
+- **Answer:** The hard parts are measuring dynamic rows, preserving scroll position during inserts, recycling without leaking row state, avoiding blank areas, and coordinating JS work with native scroll. A faster list component still fails if row rendering and image decoding dominate the frame budget.
+
+```txt
+scroll offset + measured heights + render window + recycled cells
+= list correctness under pressure
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
+<a id="g32"></a>
+### G32. Why does FlashList v2 benefit from the New Architecture?
+
+- **Answer:** FlashList v2 can lean on New Architecture behavior such as synchronous measurement and improved rendering coordination. That lets it reduce estimate-driven layout errors that older virtualized approaches had to work around.
+
+```tsx
+<FlashList
+  data={items}
+  renderItem={renderItem}
+  maintainVisibleContentPosition={{ disabled: false }}
+/>
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
+<a id="g33"></a>
+### G33. What is the deep tradeoff of React Native for Web?
+
+- **Answer:** React Native for Web gives a shared component model, but the host platform is still the browser. You must account for DOM semantics, CSS layout, accessibility trees, SSR/SEO expectations, bundle splitting, and desktop input patterns.
+
+```tsx
+const Link = Platform.OS === "web" ? WebAnchor : NativePressableLink;
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
+<a id="g34"></a>
+### G34. What is the exact contract between an OTA bundle and native runtime?
+
+- **Answer:** The native runtime owns native modules, generated code, permissions, assets loading, and update client behavior. An OTA bundle is safe only when its JavaScript expects exactly the native capabilities present in the installed binary.
+
+```txt
+native runtime version X
+  accepts only JS/assets built for runtime X
+native runtime version Y
+  requires a new binary or matching update channel
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
+<a id="g35"></a>
+### G35. What can go wrong with AI streaming on mobile?
+
+- **Answer:** Streams can fail through flaky networks, backgrounding, proxy buffering, malformed provider chunks, backpressure, duplicate retries, and partial moderation failures. Robust clients model stream state explicitly instead of treating streaming as a fancy string append.
+
+```ts
+type StreamState = "idle" | "connecting" | "streaming" | "aborted" | "failed" | "done";
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
+<a id="g36"></a>
+### G36. What is the native boundary for local LLM inference?
+
+- **Answer:** The native side should own model loading, memory mapping, accelerator selection, token generation, cancellation, and thermal/memory handling. JavaScript should get a small typed API, progress events, and safe errors, not raw model internals.
+
+```ts
+type LocalLLM = {
+  load(modelId: string): Promise<void>;
+  generate(prompt: string, options: GenerateOptions): AsyncIterable<string>;
+  cancel(requestId: string): Promise<void>;
+};
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
+<a id="g37"></a>
+### G37. How does Gemma 4 change the local AI conversation for React Native?
+
+- **Answer:** Gemma 4's edge-focused E2B and E4B models make serious on-device AI more realistic, especially through Google AI Edge and LiteRT-style runtimes. The React Native challenge is still packaging, native bindings, device capability checks, and designing features that do useful work with small local models.
+
+```txt
+Gemma 4 E2B/E4B -> local capability
+React Native app -> native runtime wrapper + safe JS API
+Product -> fallback when device cannot run it
+```
+
+[⬆️ Jump back](#god-mode-questions)
+
 ---
 
 ## Source Trail
@@ -1782,8 +2154,19 @@ Primary sources used for the current baseline:
 - [React Native FlatList docs](https://reactnative.dev/docs/flatlist)
 - [React Native InteractionManager docs](https://reactnative.dev/docs/interactionmanager)
 - [React Native Security docs](https://reactnative.dev/docs/next/security)
+- [React Native for Web docs](https://necolas.github.io/react-native-web/)
+- [Expo: Develop websites with Expo](https://docs.expo.dev/workflow/web/)
 - [Expo SDK version reference](https://docs.expo.dev/versions/latest/)
 - [Expo SDK 56 beta changelog](https://expo.dev/changelog/sdk-56-beta)
+- [Expo: Runtime versions and updates](https://docs.expo.dev/eas-update/runtime-versions/)
+- [Expo: Deploy updates](https://docs.expo.dev/eas-update/deployment/)
+- [FlashList docs](https://shopify.github.io/flash-list/docs/)
+- [Shopify Engineering: FlashList v2](https://shopify.engineering/flashlist-v2)
+- [Legend List overview](https://legendapp.com/open-source/list/v3/overview/)
+- [Legend List React Native getting started](https://legendapp.com/open-source/list/v3/react-native/getting-started/)
+- [Google: Gemma 4](https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/)
+- [Google Developers: Gemma 4 on the edge](https://developers.googleblog.com/bring-state-of-the-art-agentic-skills-to-the-edge-with-gemma-4/)
+- [Google AI Edge: LLM Inference guide](https://ai.google.dev/edge/mediapipe/solutions/genai/llm_inference)
 - [Software Mansion: React Native in 2026 Trends and Predictions](https://swmansion.com/blog/react-native-in-2026-trends-our-predictions-463a837420c7/)
 - [Callstack: React Native Wrapped 2025](https://www.callstack.com/blog/react-native-wrapped-2025-a-month-by-month-recap-of-the-year)
 - [Infinite Red: React Native Wrapped 2025](https://shift.infinite.red/react-native-wrapped-2025-the-year-we-entered-our-polishing-era-79c6a3e5b4b7)
